@@ -1,0 +1,29 @@
+# HyprCaffeine Default Configuration
+theme:
+  accent: "#89b4fa"
+  border: rounded
+  style: catppuccin
+
+timeouts:
+  default: 1800  # 30 minutes
+  presets:
+    - 900   # 15 min
+    - 1800  # 30 min
+    - 3600  # 1 hour
+    - 7200  # 2 hours
+
+automation:
+  fullscreen: false
+  audio: false
+  steam: false
+  discord: false
+  custom_processes: []
+
+notifications:
+  enabled: true
+  expire_warning: 60  # warn 60s before expiry
+
+waybar:
+  icon_active: "󰒲"
+  icon_inactive: "☕"
+  icon_infinite: "∞"

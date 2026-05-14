@@ -1,0 +1,8 @@
+"custom/hyprcaffeine": {
+  "exec": "hyprcaffeine waybar",
+  "on-click": "hyprcaffeine toggle",
+  "on-click-right": "hyprcaffeine off",
+  "on-click-middle": "hyprcaffeine menu",
+  "interval": 1,
+  "return-type": "json"
+}

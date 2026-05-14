@@ -1,0 +1,345 @@
+#!/usr/bin/env bash
+# HyprCaffeine — Idle inhibition utility for Hyprland
+# Version: 1.0.0
+# Author: HyprCaffeine Contributors
+# License: MIT
+
+set -euo pipefail
+
+# ── Path Resolution ──────────────────────────────────────────────────────────
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+LIB_DIR="${SCRIPT_DIR}/../scripts"
+
+# ── Version ──────────────────────────────────────────────────────────────────
+readonly VERSION="1.0.0"
+readonly APP_NAME="HyprCaffeine"
+
+# ── Catppuccin Mocha Palette ─────────────────────────────────────────────────
+readonly CLR_TEXT="#cdd6f4"
+readonly CLR_SURFACE="#1e1e2e"
+readonly CLR_BLUE="#89b4fa"
+readonly CLR_GREEN="#a6e3a1"
+readonly CLR_RED="#f38ba8"
+readonly CLR_YELLOW="#f9e2af"
+
+# ── Nerd Font Icons ──────────────────────────────────────────────────────────
+readonly ICON_ACTIVE="󰒲"
+readonly ICON_INACTIVE="☕"
+readonly ICON_INFINITE="∞"
+
+# ── State Directory ──────────────────────────────────────────────────────────
+readonly STATE_DIR="${HOME}/.cache/hyprcaffeine"
+readonly STATE_FILE="${STATE_DIR}/state.json"
+
+# ── Source Libraries ─────────────────────────────────────────────────────────
+source "${LIB_DIR}/config.sh"
+source "${LIB_DIR}/state.sh"
+source "${LIB_DIR}/timer.sh"
+source "${LIB_DIR}/notify.sh"
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+show_help() {
+    cat <<EOF
+${APP_NAME} v${VERSION} — Idle inhibition utility for Hyprland
+
+USAGE:
+    hyprcaffeine [SUBCOMMAND] [OPTIONS]
+
+SUBCOMMANDS:
+    (none)              Show interactive gum menu with timer presets
+    on [DURATION]       Activate idle inhibition (e.g., 30m, 2h, infinite)
+    off                 Deactivate idle inhibition
+    status              Show current inhibition state
+    toggle              Toggle inhibition on/off
+    waybar              Output Waybar-compatible JSON status
+    menu                Premium launcher mode (walker/wofi)
+
+OPTIONS:
+    --help              Show this help message
+    --version           Show version information
+
+EXAMPLES:
+    hyprcaffeine                # Interactive menu
+    hyprcaffeine on 30m         # Inhibit for 30 minutes
+    hyprcaffeine on 2h          # Inhibit for 2 hours
+    hyprcaffeine on infinite    # Inhibit indefinitely
+    hyprcaffeine off            # Stop inhibition
+    hyprcaffeine status         # Check current state
+    hyprcaffeine toggle         # Toggle on/off
+    hyprcaffeine waybar         # Waybar module output
+EOF
+}
+
+show_version() {
+    echo "${APP_NAME} v${VERSION}"
+}
+
+# ── Core Actions ─────────────────────────────────────────────────────────────
+
+do_activate() {
+    local duration="${1:-infinite}"
+    local duration_seconds
+
+    # Parse duration string to seconds
+    case "${duration}" in
+        infinite|inf)
+            duration_seconds=0  # 0 means infinite
+            ;;
+        *s)
+            duration_seconds="${duration%s}"
+            ;;
+        *m)
+            duration_seconds=$(( ${duration%m} * 60 ))
+            ;;
+        *h)
+            duration_seconds=$(( ${duration%h} * 3600 ))
+            ;;
+        *)
+            # Try as raw number of minutes if no suffix
+            if [[ "${duration}" =~ ^[0-9]+$ ]]; then
+                duration_seconds=$(( duration * 60 ))
+            else
+                notify_error "Invalid duration: ${duration}"
+                echo "Error: Invalid duration '${duration}'. Use formats like 30m, 2h, infinite." >&2
+                exit 1
+            fi
+            ;;
+    esac
+
+    # Activate idle inhibition via hyprctl
+    hyprctl dispatch idleinhibit on 2>/dev/null || {
+        notify_error "Failed to activate idle inhibition"
+        echo "Error: Could not communicate with Hyprland." >&2
+        exit 1
+    }
+
+    # Save state
+    state_save "active" "${duration_seconds}" "$$"
+    timer_start "${duration_seconds}"
+
+    # Notification
+    local human_duration
+    if [[ "${duration_seconds}" -eq 0 ]]; then
+        human_duration="${ICON_INFINITE} infinite"
+    else
+        human_duration="$(timer_human "${duration_seconds}")"
+    fi
+
+    notify_send "${ICON_ACTIVE} Caffeine Active" "Idle inhibition enabled for ${human_duration}"
+    echo "${ICON_ACTIVE} Caffeine activated — duration: ${human_duration}"
+}
+
+do_deactivate() {
+    # Kill any running background timer
+    timer_stop
+
+    # Deactivate idle inhibition via hyprctl
+    hyprctl dispatch idleinhibit off 2>/dev/null || {
+        notify_error "Failed to deactivate idle inhibition"
+        echo "Error: Could not communicate with Hyprland." >&2
+        exit 1
+    }
+
+    # Clear state
+    state_save "inactive" "0" ""
+    notify_send "${ICON_INACTIVE} Caffeine Off" "Idle inhibition disabled"
+    echo "${ICON_INACTIVE} Caffeine deactivated"
+}
+
+do_status() {
+    local state
+    state="$(state_get_status)"
+
+    if [[ "${state}" == "active" ]]; then
+        local remaining
+        remaining="$(state_get_remaining)"
+        local duration
+        duration="$(state_get_duration)"
+
+        if [[ "${duration}" == "0" ]]; then
+            echo "${ICON_ACTIVE} Active — ${ICON_INFINITE} infinite"
+        else
+            echo "${ICON_ACTIVE} Active — remaining: ${remaining}"
+        fi
+    else
+        echo "${ICON_INACTIVE} Inactive"
+    fi
+}
+
+do_toggle() {
+    local state
+    state="$(state_get_status)"
+
+    if [[ "${state}" == "active" ]]; then
+        do_deactivate
+    else
+        do_activate "infinite"
+    fi
+}
+
+do_waybar() {
+    local state
+    state="$(state_get_status)"
+
+    if [[ "${state}" == "active" ]]; then
+        local duration
+        duration="$(state_get_duration)"
+        local tooltip
+
+        if [[ "${duration}" == "0" ]]; then
+            tooltip="Caffeine: ${ICON_INFINITE} Infinite"
+        else
+            local remaining
+            remaining="$(state_get_remaining)"
+            tooltip="Caffeine: ${remaining} remaining"
+        fi
+
+        # Waybar JSON output — active state
+        cat <<EOF
+{"text": "${ICON_ACTIVE}", "tooltip": "${tooltip}", "class": "active"}
+EOF
+    else
+        # Waybar JSON output — inactive state
+        cat <<EOF
+{"text": "${ICON_INACTIVE}", "tooltip": "Caffeine: Off", "class": "inactive"}
+EOF
+    fi
+}
+
+do_menu() {
+    # Premium launcher mode — try walker first, fallback to wofi
+    local launcher=""
+    if command -v walker &>/dev/null; then
+        launcher="walker"
+    elif command -v wofi &>/dev/null; then
+        launcher="wofi"
+    else
+        notify_error "No supported launcher found (walker/wofi)"
+        echo "Error: Install walker or wofi for menu mode." >&2
+        exit 1
+    fi
+
+    local choice
+    case "${launcher}" in
+        walker)
+            choice=$(echo -e "on 15m\non 30m\non 1h\non 2h\non infinite\noff\nstatus" | walker -d --prompt="${ICON_INACTIVE} HyprCaffeine" 2>/dev/null)
+            ;;
+        wofi)
+            choice=$(echo -e "☕ 15 minutes\n☕ 30 minutes\n🔥 1 hour\n🔥 2 hours\n♾️ Infinite\n❌ Disable" | wofi -d -p "${ICON_INACTIVE} HyprCaffeine" 2>/dev/null)
+            ;;
+    esac
+
+    [[ -z "${choice}" ]] && exit 0
+
+    # Map menu labels to commands for wofi
+    case "${choice}" in
+        "☕ 15 minutes"|"on 15m")  do_activate "15m"  ;;
+        "☕ 30 minutes"|"on 30m")  do_activate "30m"  ;;
+        "🔥 1 hour"|"on 1h")      do_activate "1h"   ;;
+        "🔥 2 hours"|"on 2h")     do_activate "2h"   ;;
+        "♾️ Infinite"|"on infinite") do_activate "infinite" ;;
+        "❌ Disable"|"off")        do_deactivate      ;;
+        "status")                  do_status           ;;
+    esac
+}
+
+do_interactive_menu() {
+    # Interactive gum menu
+    if ! command -v gum &>/dev/null; then
+        notify_error "gum is required for interactive mode"
+        echo "Error: Install gum for interactive menu (https://github.com/charmbracelet/gum)" >&2
+        exit 1
+    fi
+
+    local header_text
+    header_text="${ICON_INACTIVE} ${APP_NAME}"
+
+    local state
+    state="$(state_get_status 2>/dev/null || echo "inactive")"
+    if [[ "${state}" == "active" ]]; then
+        header_text="${ICON_ACTIVE} ${APP_NAME} (active)"
+    fi
+
+    local choice
+    choice=$(gum choose \
+        --header="${header_text}" \
+        --header.border="rounded" \
+        --header.margin="0 0 1 0" \
+        --cursor="→ " \
+        --cursor.foreground="${CLR_BLUE}" \
+        --selected.foreground="${CLR_GREEN}" \
+        --item.foreground="${CLR_TEXT}" \
+        --border="rounded" \
+        --border.foreground="${CLR_SURFACE}" \
+        --height="11" \
+        "☕ 15 minutos" \
+        "☕ 30 minutos" \
+        "🔥 1 hora" \
+        "🔥 2 horas" \
+        "♾️ Infinito" \
+        "❌ Desactivar" \
+        "🚪 Salir" \
+        2>/dev/null)
+
+    [[ -z "${choice}" ]] && exit 0
+
+    case "${choice}" in
+        "☕ 15 minutos")   do_activate "15m"    ;;
+        "☕ 30 minutos")   do_activate "30m"    ;;
+        "🔥 1 hora")       do_activate "1h"     ;;
+        "🔥 2 horas")      do_activate "2h"     ;;
+        "♾️ Infinito")     do_activate "infinite" ;;
+        "❌ Desactivar")   do_deactivate        ;;
+        "🚪 Salir")        exit 0               ;;
+    esac
+}
+
+# ── Main Entry Point ─────────────────────────────────────────────────────────
+
+main() {
+    # Ensure state directory exists
+    mkdir -p "${STATE_DIR}"
+
+    local subcommand="${1:-}"
+    shift 2>/dev/null || true
+
+    case "${subcommand}" in
+        --help|-h)
+            show_help
+            ;;
+        --version|-v)
+            show_version
+            ;;
+        on)
+            local duration="${1:-infinite}"
+            do_activate "${duration}"
+            ;;
+        off)
+            do_deactivate
+            ;;
+        status)
+            do_status
+            ;;
+        toggle)
+            do_toggle
+            ;;
+        waybar)
+            do_waybar
+            ;;
+        menu)
+            do_menu
+            ;;
+        "")
+            # No args — interactive gum menu
+            do_interactive_menu
+            ;;
+        *)
+            echo "Unknown command: ${subcommand}" >&2
+            echo "Run 'hyprcaffeine --help' for usage information." >&2
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
