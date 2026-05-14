@@ -12,6 +12,10 @@ timeouts:
     - 3600  # 1 hour
     - 7200  # 2 hours
 
+features:
+  monitor: false  # Keep monitor on (prevent DPMS timeout)
+  lid: false      # Inhibit lid-close suspend
+
 automation:
   fullscreen: false
   audio: false
@@ -27,3 +31,5 @@ waybar:
   icon_active: "󰒲"
   icon_inactive: "☕"
   icon_infinite: "∞"
+  icon_monitor: "🖥"
+  icon_lid: "🕮"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HyprCaffeine — Idle inhibition utility for Hyprland
-# Version: 1.0.0
+# Version: 1.1.0
 # Author: HyprCaffeine Contributors
 # License: MIT
 
@@ -11,7 +11,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 LIB_DIR="${SCRIPT_DIR}/../scripts"
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="1.0.0"
+readonly VERSION="1.1.0"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -30,6 +30,8 @@ readonly CLR_YELLOW="#f9e2af"
 readonly ICON_ACTIVE="󰒲"
 readonly ICON_INACTIVE="☕"
 readonly ICON_INFINITE="∞"
+readonly ICON_MONITOR="🖥"
+readonly ICON_LID="🕮"
 
 # ── State Directory ──────────────────────────────────────────────────────────
 readonly STATE_DIR="${HOME}/.cache/hyprcaffeine"
@@ -40,6 +42,8 @@ source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/state.sh"
 source "${LIB_DIR}/timer.sh"
 source "${LIB_DIR}/notify.sh"
+source "${LIB_DIR}/hyprland.sh"
+source "${LIB_DIR}/watcher.sh"
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,25 +57,38 @@ USAGE:
 SUBCOMMANDS:
     (none)              Show interactive gum menu with timer presets
     on [DURATION]       Activate idle inhibition (e.g., 30m, 2h, infinite)
-    off                 Deactivate idle inhibition
+    off                 Deactivate all inhibition and features
     status              Show current inhibition state
     toggle              Toggle inhibition on/off
     waybar              Output Waybar-compatible JSON status
     menu                Premium launcher mode (walker/wofi)
+    watcher start       Start the auto-activate watcher daemon
+    watcher stop        Stop the watcher daemon
+    watcher status      Show watcher daemon status
+
+FEATURE FLAGS (use with 'on'):
+    --monitor           Keep monitor on (force DPMS on, prevent screen blank)
+    --lid               Inhibit lid-close suspend (block systemd lid switch)
+    --auto              Mark as auto-activated (used internally by watcher)
 
 OPTIONS:
     --help              Show this help message
     --version           Show version information
 
 EXAMPLES:
-    hyprcaffeine                # Interactive menu
-    hyprcaffeine on 30m         # Inhibit for 30 minutes
-    hyprcaffeine on 2h          # Inhibit for 2 hours
-    hyprcaffeine on infinite    # Inhibit indefinitely
-    hyprcaffeine off            # Stop inhibition
-    hyprcaffeine status         # Check current state
-    hyprcaffeine toggle         # Toggle on/off
-    hyprcaffeine waybar         # Waybar module output
+    hyprcaffeine                      # Interactive menu
+    hyprcaffeine on 30m               # Inhibit idle for 30 minutes
+    hyprcaffeine on 2h                # Inhibit idle for 2 hours
+    hyprcaffeine on infinite          # Inhibit indefinitely
+    hyprcaffeine on 30m --monitor     # Inhibit idle + keep monitor on
+    hyprcaffeine on 2h --monitor --lid # Full: idle + monitor + lid inhibit
+    hyprcaffeine on infinite --lid    # Infinite idle + lid inhibit
+    hyprcaffeine off                  # Stop all inhibition
+    hyprcaffeine status               # Check current state
+    hyprcaffeine toggle               # Toggle on/off
+    hyprcaffeine waybar               # Waybar module output
+    hyprcaffeine watcher start        # Start auto-activate daemon
+    hyprcaffeine watcher status       # Check watcher status
 EOF
 }
 
@@ -79,10 +96,44 @@ show_version() {
     echo "${APP_NAME} v${VERSION}"
 }
 
+# ── Parse feature flags from arguments ──────────────────────────────────────
+# Consumes --monitor, --lid, --auto from remaining args, returns duration
+parse_on_args() {
+    local args=("$@")
+    FEATURE_MONITOR=false
+    FEATURE_LID=false
+    FEATURE_AUTO=false
+    FEATURE_DURATION="infinite"
+
+    for arg in "${args[@]}"; do
+        case "${arg}" in
+            --monitor)
+                FEATURE_MONITOR=true
+                ;;
+            --lid)
+                FEATURE_LID=true
+                ;;
+            --auto)
+                FEATURE_AUTO=true
+                ;;
+            --*)
+                echo "Error: Unknown flag '${arg}'" >&2
+                exit 1
+                ;;
+            *)
+                FEATURE_DURATION="${arg}"
+                ;;
+        esac
+    done
+}
+
 # ── Core Actions ─────────────────────────────────────────────────────────────
 
 do_activate() {
     local duration="${1:-infinite}"
+    local monitor_flag="${2:-false}"
+    local lid_flag="${3:-false}"
+    local auto_flag="${4:-false}"
     local duration_seconds
 
     # Parse duration string to seconds
@@ -111,47 +162,87 @@ do_activate() {
             ;;
     esac
 
-    # Activate idle inhibition via hyprctl
+    # ── Activate idle inhibition via hyprctl ──
     if [[ "${DRY_RUN}" == true ]]; then
         echo "[dry-run] hyprctl dispatch idleinhibit on"
     else
-        hyprctl dispatch idleinhibit on 2>/dev/null || {
+        hypr_idle_inhibit_on || {
             echo "Warning: Could not reach Hyprland — state saved anyway." >&2
         }
     fi
 
+    # ── Activate monitor-on feature ──
+    if [[ "${monitor_flag}" == true ]]; then
+        if [[ "${DRY_RUN}" == true ]]; then
+            echo "[dry-run] hyprctl dispatch dpms on (monitor keep-awake)"
+        else
+            hypr_monitor_on || {
+                echo "Warning: Monitor control failed — continuing without it." >&2
+            }
+        fi
+    fi
+
+    # ── Activate lid-close inhibit feature ──
+    if [[ "${lid_flag}" == true ]]; then
+        if [[ "${DRY_RUN}" == true ]]; then
+            echo "[dry-run] systemd-inhibit --what=handle-lid-switch --who=HyprCaffeine --why='User requested' --mode=block sleep infinity &"
+        else
+            lid_inhibit_start || {
+                echo "Warning: Lid inhibition failed — continuing without it." >&2
+            }
+        fi
+    fi
+
+    # Build features JSON
+    local features_json
+    features_json="$(state_build_features "true" "${monitor_flag}" "${lid_flag}" "${auto_flag}")"
+
     # Save state
-    state_save "active" "${duration_seconds}" ""
+    state_save "active" "${duration_seconds}" "" "${features_json}"
     timer_start "${duration_seconds}"
 
-    # Notification
-    local human_duration
+    # Build human-readable description
+    local human_duration feature_parts=()
     if [[ "${duration_seconds}" -eq 0 ]]; then
         human_duration="${ICON_INFINITE} infinite"
     else
         human_duration="$(timer_human "${duration_seconds}")"
     fi
 
-    notify_send "${ICON_ACTIVE} Caffeine Active" "Idle inhibition enabled for ${human_duration}"
-    echo "${ICON_ACTIVE} Caffeine activated — duration: ${human_duration}"
+    [[ "${monitor_flag}" == true ]] && feature_parts+=("${ICON_MONITOR} monitor-on")
+    [[ "${lid_flag}" == true ]] && feature_parts+=("${ICON_LID} lid-inhibit")
+
+    local feature_text=""
+    if [[ ${#feature_parts[@]} -gt 0 ]]; then
+        feature_text=" ($(IFS=', '; echo "${feature_parts[*]}"))"
+    fi
+
+    # Notification
+    notify_send "${ICON_ACTIVE} Caffeine Active" "Idle inhibition enabled for ${human_duration}${feature_text}"
+    echo "${ICON_ACTIVE} Caffeine activated — duration: ${human_duration}${feature_text}"
 }
 
 do_deactivate() {
     # Kill any running background timer
     timer_stop
 
+    # Stop lid inhibitor if running
+    if [[ "${DRY_RUN}" == true ]]; then
+        echo "[dry-run] lid_inhibit_stop"
+    else
+        lid_inhibit_stop
+    fi
+
     # Deactivate idle inhibition via hyprctl
     if [[ "${DRY_RUN}" == true ]]; then
         echo "[dry-run] hyprctl dispatch idleinhibit off"
     else
-        hyprctl dispatch idleinhibit off 2>/dev/null || {
-            echo "Warning: Could not reach Hyprland — state cleared anyway." >&2
-        }
+        hypr_idle_inhibit_off
     fi
 
-    # Clear state
-    state_save "inactive" "0" ""
-    notify_send "${ICON_INACTIVE} Caffeine Off" "Idle inhibition disabled"
+    # Clear state (all features off)
+    state_save "inactive" "0" "" '{"idle":false,"monitor":false,"lid":false,"auto":false}'
+    notify_send "${ICON_INACTIVE} Caffeine Off" "All inhibition disabled"
     echo "${ICON_INACTIVE} Caffeine deactivated"
 }
 
@@ -160,16 +251,32 @@ do_status() {
     state="$(state_get_status)"
 
     if [[ "${state}" == "active" ]]; then
-        local remaining
+        local remaining duration
         remaining="$(state_get_remaining)"
-        local duration
         duration="$(state_get_duration)"
 
+        local status_text=""
         if [[ "${duration}" == "0" ]]; then
-            echo "${ICON_ACTIVE} Active — ${ICON_INFINITE} infinite"
+            status_text="${ICON_ACTIVE} Active — ${ICON_INFINITE} infinite"
         else
-            echo "${ICON_ACTIVE} Active — remaining: ${remaining}"
+            status_text="${ICON_ACTIVE} Active — remaining: ${remaining}"
         fi
+
+        # Append feature flags
+        local features_display
+        features_display="$(state_get_features_display)"
+        if [[ -n "${features_display}" ]]; then
+            status_text="${status_text} ${features_display}"
+        fi
+
+        # Show auto flag
+        local auto_val
+        auto_val="$(state_get_feature auto)"
+        if [[ "${auto_val}" == "true" ]]; then
+            status_text="${status_text} [auto]"
+        fi
+
+        echo "${status_text}"
     else
         echo "${ICON_INACTIVE} Inactive"
     fi
@@ -182,7 +289,7 @@ do_toggle() {
     if [[ "${state}" == "active" ]]; then
         do_deactivate
     else
-        do_activate "infinite"
+        do_activate "infinite" false false
     fi
 }
 
@@ -193,7 +300,7 @@ do_waybar() {
     if [[ "${state}" == "active" ]]; then
         local duration
         duration="$(state_get_duration)"
-        local tooltip
+        local tooltip feature_icons=""
 
         if [[ "${duration}" == "0" ]]; then
             tooltip="Caffeine: ${ICON_INFINITE} Infinite"
@@ -203,9 +310,23 @@ do_waybar() {
             tooltip="Caffeine: ${remaining} remaining"
         fi
 
+        # Build feature icons
+        local idle monitor lid
+        idle="$(state_get_feature idle)"
+        monitor="$(state_get_feature monitor)"
+        lid="$(state_get_feature lid)"
+
+        [[ "${monitor}" == "true" ]] && feature_icons="${feature_icons} ${ICON_MONITOR}"
+        [[ "${lid}" == "true" ]] && feature_icons="${feature_icons} ${ICON_LID}"
+
+        local text="${ICON_ACTIVE}${feature_icons}"
+
+        # Escape JSON special characters in tooltip
+        tooltip="$(echo "${tooltip}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+
         # Waybar JSON output — active state
         cat <<EOF
-{"text": "${ICON_ACTIVE}", "tooltip": "${tooltip}", "class": "active"}
+{"text": "${text}", "tooltip": "${tooltip}", "class": "active"}
 EOF
     else
         # Waybar JSON output — inactive state
@@ -231,24 +352,27 @@ do_menu() {
     local choice
     case "${launcher}" in
         walker)
-            choice=$(echo -e "on 15m\non 30m\non 1h\non 2h\non infinite\noff\nstatus" | walker -d --prompt="${ICON_INACTIVE} HyprCaffeine" 2>/dev/null)
+            choice=$(echo -e "on 15m\non 30m\non 1h\non 2h\non infinite\non infinite --monitor\non infinite --lid\non infinite --monitor --lid\noff\nstatus" | walker -d --prompt="${ICON_INACTIVE} HyprCaffeine" 2>/dev/null)
             ;;
         wofi)
-            choice=$(echo -e "☕ 15 minutes\n☕ 30 minutes\n🔥 1 hour\n🔥 2 hours\n♾️ Infinite\n❌ Disable" | wofi -d -p "${ICON_INACTIVE} HyprCaffeine" 2>/dev/null)
+            choice=$(echo -e "☕ 15 minutes\n☕ 30 minutes\n🔥 1 hour\n🔥 2 hours\n♾️ Infinite\n🖥 Infinite + Monitor\n🕮 Infinite + Lid\n🖥🕮 Full (Inf+Mon+Lid)\n❌ Disable" | wofi -d -p "${ICON_INACTIVE} HyprCaffeine" 2>/dev/null)
             ;;
     esac
 
     [[ -z "${choice}" ]] && exit 0
 
-    # Map menu labels to commands for wofi
+    # Map menu labels to commands
     case "${choice}" in
-        "☕ 15 minutes"|"on 15m")  do_activate "15m"  ;;
-        "☕ 30 minutes"|"on 30m")  do_activate "30m"  ;;
-        "🔥 1 hour"|"on 1h")      do_activate "1h"   ;;
-        "🔥 2 hours"|"on 2h")     do_activate "2h"   ;;
-        "♾️ Infinite"|"on infinite") do_activate "infinite" ;;
-        "❌ Disable"|"off")        do_deactivate      ;;
-        "status")                  do_status           ;;
+        "☕ 15 minutes"|"on 15m")                          do_activate "15m" false false     ;;
+        "☕ 30 minutes"|"on 30m")                          do_activate "30m" false false     ;;
+        "🔥 1 hour"|"on 1h")                              do_activate "1h" false false      ;;
+        "🔥 2 hours"|"on 2h")                             do_activate "2h" false false      ;;
+        "♾️ Infinite"|"on infinite")                       do_activate "infinite" false false ;;
+        "🖥 Infinite + Monitor"|"on infinite --monitor")   do_activate "infinite" true false  ;;
+        "🕮 Infinite + Lid"|"on infinite --lid")            do_activate "infinite" false true  ;;
+        "🖥🕮 Full (Inf+Mon+Lid)"|"on infinite --monitor --lid") do_activate "infinite" true true ;;
+        "❌ Disable"|"off")                                do_deactivate                      ;;
+        "status")                                          do_status                          ;;
     esac
 }
 
@@ -280,12 +404,15 @@ do_interactive_menu() {
         --item.foreground="${CLR_TEXT}" \
         --border="rounded" \
         --border.foreground="${CLR_SURFACE}" \
-        --height="11" \
+        --height="13" \
         "☕ 15 minutos" \
         "☕ 30 minutos" \
         "🔥 1 hora" \
         "🔥 2 horas" \
         "♾️ Infinito" \
+        "🖥 Infinito + Monitor" \
+        "🕮 Infinito + Lid" \
+        "🖥🕮 Full (Todo)" \
         "❌ Desactivar" \
         "🚪 Salir" \
         2>/dev/null)
@@ -293,13 +420,16 @@ do_interactive_menu() {
     [[ -z "${choice}" ]] && exit 0
 
     case "${choice}" in
-        "☕ 15 minutos")   do_activate "15m"    ;;
-        "☕ 30 minutos")   do_activate "30m"    ;;
-        "🔥 1 hora")       do_activate "1h"     ;;
-        "🔥 2 horas")      do_activate "2h"     ;;
-        "♾️ Infinito")     do_activate "infinite" ;;
-        "❌ Desactivar")   do_deactivate        ;;
-        "🚪 Salir")        exit 0               ;;
+        "☕ 15 minutos")       do_activate "15m" false false     ;;
+        "☕ 30 minutos")       do_activate "30m" false false     ;;
+        "🔥 1 hora")           do_activate "1h" false false      ;;
+        "🔥 2 horas")          do_activate "2h" false false      ;;
+        "♾️ Infinito")         do_activate "infinite" false false ;;
+        "🖥 Infinito + Monitor") do_activate "infinite" true false ;;
+        "🕮 Infinito + Lid")    do_activate "infinite" false true  ;;
+        "🖥🕮 Full (Todo)")     do_activate "infinite" true true   ;;
+        "❌ Desactivar")       do_deactivate                     ;;
+        "🚪 Salir")            exit 0                            ;;
     esac
 }
 
@@ -320,8 +450,9 @@ main() {
             show_version
             ;;
         on)
-            local duration="${1:-infinite}"
-            do_activate "${duration}"
+            # Parse all arguments (duration + feature flags)
+            parse_on_args "$@"
+            do_activate "${FEATURE_DURATION}" "${FEATURE_MONITOR}" "${FEATURE_LID}" "${FEATURE_AUTO}"
             ;;
         off)
             do_deactivate
@@ -337,6 +468,24 @@ main() {
             ;;
         menu)
             do_menu
+            ;;
+        watcher)
+            local watcher_action="${1:-}"
+            case "${watcher_action}" in
+                start)
+                    watcher_start
+                    ;;
+                stop)
+                    watcher_stop
+                    ;;
+                status)
+                    watcher_status
+                    ;;
+                *)
+                    echo "Usage: hyprcaffeine watcher <start|stop|status>" >&2
+                    exit 1
+                    ;;
+            esac
             ;;
         "")
             # No args — interactive gum menu

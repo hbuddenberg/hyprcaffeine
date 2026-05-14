@@ -9,19 +9,19 @@ readonly HC_VERSION="1.0.0"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Catppuccin Mocha Colors (truecolor ANSI) ─────────────
-readonly C_RED='\033[38;2;243;139;168m'      # #f38ba8  Rose
-readonly C_PEACH='\033[38;2;250;179;135m'    # #fab387
-readonly C_YELLOW='\033[38;2;249;226;175m'   # #f9e2af
-readonly C_GREEN='\033[38;2;166;227;161m'    # #a6e3a1
-readonly C_BLUE='\033[38;2;137;180;250m'     # #89b4fa
-readonly C_MAUVE='\033[38;2;203;166;247m'    # #cba6f7
-readonly C_TEAL='\033[38;2;148;226;213m'     # #94e2d5
-readonly C_TEXT='\033[38;2;205;214;244m'     # #cdd6f4
-readonly C_SURFACE0='\033[38;2;49;50;68m'    # #313244
-readonly C_SUBTEXT='\033[38;2;166;173;200m'  # #a6adc8
-readonly C_BOLD='\033[1m'
-readonly C_DIM='\033[2m'
-readonly C_RESET='\033[0m'
+readonly C_RED=$'\033[38;2;243;139;168m'      # #f38ba8  Rose
+readonly C_PEACH=$'\033[38;2;250;179;135m'    # #fab387
+readonly C_YELLOW=$'\033[38;2;249;226;175m'   # #f9e2af
+readonly C_GREEN=$'\033[38;2;166;227;161m'    # #a6e3a1
+readonly C_BLUE=$'\033[38;2;137;180;250m'     # #89b4fa
+readonly C_MAUVE=$'\033[38;2;203;166;247m'    # #cba6f7
+readonly C_TEAL=$'\033[38;2;148;226;213m'     # #94e2d5
+readonly C_TEXT=$'\033[38;2;205;214;244m'     # #cdd6f4
+readonly C_SURFACE0=$'\033[38;2;49;50;68m'    # #313244
+readonly C_SUBTEXT=$'\033[38;2;166;173;200m'  # #a6adc8
+readonly C_BOLD=$'\033[1m'
+readonly C_DIM=$'\033[2m'
+readonly C_RESET=$'\033[0m'
 
 # ── Source Paths ─────────────────────────────────────────
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
