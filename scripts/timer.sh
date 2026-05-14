@@ -15,25 +15,30 @@ timer_start() {
     # Kill any existing timer
     timer_stop
 
-    # Start background timer process
-    (
-        sleep "${duration_seconds}"
-        # Deactivate when timer expires
-        hyprctl dispatch idleinhibit off 2>/dev/null || true
-        # Update state file
-        local state_dir="${HOME}/.cache/hyprcaffeine"
-        local state_file="${state_dir}/state.json"
-        if [[ -f "${state_file}" ]]; then
-            echo '{"status":"inactive","duration":0,"activated_at":"","pid":""}' > "${state_file}"
-        fi
-        # Send expiry notification
-        notify-send -a HyprCaffeine "☕ Caffeine Expired" "Idle inhibition timer ended" 2>/dev/null || true
-    ) &
-
-    # Save timer PID to state
-    local timer_pid=$!
     local state_dir="${HOME}/.cache/hyprcaffeine"
     local state_file="${state_dir}/state.json"
+    local pid_file="${state_dir}/timer.pid"
+
+    # Write a standalone timer script and run it fully detached via setsid
+    local timer_script="${state_dir}/.timer_worker.sh"
+    cat > "${timer_script}" <<EOF
+#!/usr/bin/env bash
+sleep ${duration_seconds}
+hyprctl dispatch idleinhibit off 2>/dev/null || true
+echo '{"status":"inactive","duration":0,"activated_at":"","pid":""}' > ${state_file}
+notify-send -a HyprCaffeine '☕ Caffeine Expired' 'Idle inhibition timer ended' 2>/dev/null || true
+rm -f ${pid_file}
+rm -f ${timer_script}
+EOF
+    chmod +x "${timer_script}"
+
+    # Launch fully detached — setsid creates new session, disowns from process group
+    setsid bash "${timer_script}" >/dev/null 2>&1 &
+    local timer_pid=$!
+
+    echo "${timer_pid}" > "${pid_file}"
+
+    # Update state file with timer PID
     if [[ -f "${state_file}" ]]; then
         local status duration activated_at
         status="$(grep -oP '"status"\s*:\s*"\K[^"]+' "${state_file}" 2>/dev/null || echo "active")"
@@ -48,14 +53,15 @@ timer_start() {
 # Stop any running timer
 timer_stop() {
     local state_dir="${HOME}/.cache/hyprcaffeine"
-    local state_file="${state_dir}/state.json"
+    local pid_file="${state_dir}/timer.pid"
 
-    if [[ -f "${state_file}" ]]; then
+    if [[ -f "${pid_file}" ]]; then
         local pid
-        pid="$(grep -oP '"pid"\s*:\s*"\K[^"]+' "${state_file}" 2>/dev/null || echo "")"
+        pid="$(cat "${pid_file}" 2>/dev/null || echo "")"
         if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
             kill "${pid}" 2>/dev/null || true
         fi
+        rm -f "${pid_file}"
     fi
 }
 

@@ -4,7 +4,7 @@
 # Author: HyprCaffeine Contributors
 # License: MIT
 
-set -euo pipefail
+set -uo pipefail
 
 # ── Path Resolution ──────────────────────────────────────────────────────────
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -13,6 +13,10 @@ LIB_DIR="${SCRIPT_DIR}/../scripts"
 # ── Version ──────────────────────────────────────────────────────────────────
 readonly VERSION="1.0.0"
 readonly APP_NAME="HyprCaffeine"
+
+# ── Dry Run Mode ─────────────────────────────────────────────────────────────
+DRY_RUN=false
+[[ "${1:-}" == "--dry-run" ]] && { DRY_RUN=true; shift; }
 
 # ── Catppuccin Mocha Palette ─────────────────────────────────────────────────
 readonly CLR_TEXT="#cdd6f4"
@@ -108,14 +112,16 @@ do_activate() {
     esac
 
     # Activate idle inhibition via hyprctl
-    hyprctl dispatch idleinhibit on 2>/dev/null || {
-        notify_error "Failed to activate idle inhibition"
-        echo "Error: Could not communicate with Hyprland." >&2
-        exit 1
-    }
+    if [[ "${DRY_RUN}" == true ]]; then
+        echo "[dry-run] hyprctl dispatch idleinhibit on"
+    else
+        hyprctl dispatch idleinhibit on 2>/dev/null || {
+            echo "Warning: Could not reach Hyprland — state saved anyway." >&2
+        }
+    fi
 
     # Save state
-    state_save "active" "${duration_seconds}" "$$"
+    state_save "active" "${duration_seconds}" ""
     timer_start "${duration_seconds}"
 
     # Notification
@@ -135,11 +141,13 @@ do_deactivate() {
     timer_stop
 
     # Deactivate idle inhibition via hyprctl
-    hyprctl dispatch idleinhibit off 2>/dev/null || {
-        notify_error "Failed to deactivate idle inhibition"
-        echo "Error: Could not communicate with Hyprland." >&2
-        exit 1
-    }
+    if [[ "${DRY_RUN}" == true ]]; then
+        echo "[dry-run] hyprctl dispatch idleinhibit off"
+    else
+        hyprctl dispatch idleinhibit off 2>/dev/null || {
+            echo "Warning: Could not reach Hyprland — state cleared anyway." >&2
+        }
+    fi
 
     # Clear state
     state_save "inactive" "0" ""
