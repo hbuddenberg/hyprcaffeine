@@ -1,50 +1,48 @@
-# Maintainer: HyprCaffeine Contributors
+# Maintainer: Hans-Dieter Buddenberg <hbuddenberg@gmail.com>
 pkgname=hyprcaffeine
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
-pkgdesc='Modern idle inhibition utility for Hyprland'
+pkgdesc='☕ Idle inhibition utility for Hyprland — caffeine for your Wayland compositor'
 arch=(any)
-url='https://github.com/hyprcaffeine/hyprcaffeine'
+url='https://github.com/hbuddenberg/hyprcaffeine'
 license=(MIT)
-depends=(bash jq hyprland gum)
+depends=(bash jq hyprland)
 optdepends=(
-    'walker: application launcher for the menu'
-    'wofi: alternative launcher for the menu'
+    'gum: interactive menu and styled prompts'
+    'libnotify: desktop notifications'
 )
-source=()
-sha256sums=()
+install=hyprcaffeine.install
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+    cd "$srcdir/$pkgname-$pkgver" || return
+
+    # Patch LIB_DIR in the binary to use the installed data path
+    sed -i "s|LIB_DIR=\"\${SCRIPT_DIR}/../scripts\"|LIB_DIR=\"/usr/share/hyprcaffeine/scripts\"|" bin/hyprcaffeine
+}
 
 package() {
-    # Binary
-    install -Dm755 "${srcdir}/../bin/hyprcaffeine" \
-        "${pkgdir}/usr/bin/hyprcaffeine"
+    cd "$srcdir/$pkgname-$pkgver" || return
 
-    # Scripts / data
-    if [[ -d "${srcdir}/../scripts" ]]; then
-        install -dm755 "${pkgdir}/usr/share/hyprcaffeine"
-        cp -r "${srcdir}/../scripts/"* "${pkgdir}/usr/share/hyprcaffeine/"
-    fi
+    # CLI binary
+    install -Dm755 bin/hyprcaffeine "${pkgdir}/usr/bin/hyprcaffeine"
+
+    # Library scripts
+    install -dm755 "${pkgdir}/usr/share/hyprcaffeine/scripts"
+    install -Dm755 scripts/*.sh "${pkgdir}/usr/share/hyprcaffeine/scripts/"
 
     # Default configuration
-    install -Dm644 "${srcdir}/../config/default.yaml" \
-        "${pkgdir}/usr/share/hyprcaffeine/default.yaml"
+    install -Dm644 config/default.yaml "${pkgdir}/usr/share/hyprcaffeine/config/default.yaml"
 
-    # Waybar module
-    install -Dm644 "${srcdir}/../waybar/module.json" \
-        "${pkgdir}/usr/share/hyprcaffeine/waybar-module.json"
+    # Waybar module template
+    install -Dm644 waybar/module.json "${pkgdir}/usr/share/hyprcaffeine/waybar-module.json"
 
     # Documentation
     install -dm755 "${pkgdir}/usr/share/doc/hyprcaffeine"
-    install -Dm644 "${srcdir}/../README.md" \
-        "${pkgdir}/usr/share/doc/hyprcaffeine/README.md"
-    install -Dm644 "${srcdir}/../docs/INSTALL.md" \
-        "${pkgdir}/usr/share/doc/hyprcaffeine/INSTALL.md"
-    install -Dm644 "${srcdir}/../docs/CONFIG.md" \
-        "${pkgdir}/usr/share/doc/hyprcaffeine/CONFIG.md"
-    install -Dm644 "${srcdir}/../docs/WAYBAR.md" \
-        "${pkgdir}/usr/share/doc/hyprcaffeine/WAYBAR.md"
+    install -Dm644 README.md "${pkgdir}/usr/share/doc/hyprcaffeine/"
+    install -Dm644 docs/*.md "${pkgdir}/usr/share/doc/hyprcaffeine/"
 
     # License
-    install -Dm644 "${srcdir}/../LICENSE" \
-        "${pkgdir}/usr/share/licenses/hyprcaffeine/LICENSE"
+    install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/$pkgname/LICENSE"
 }

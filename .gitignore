@@ -1,0 +1,20 @@
+# Runtime / cache
+.cache/
+~/.cache/hyprcaffeine/
+
+# Temp files
+*.tmp
+*.pid
+.timer_worker.sh
+state.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
