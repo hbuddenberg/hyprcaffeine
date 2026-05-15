@@ -40,8 +40,8 @@ if command -v hyprcaffeine &>/dev/null; then
     hyprcaffeine off 2>>__STATE_DIR__/timer.log || true
 fi
 
-# Fallback: kill idle inhibitors only
-for pid in $(ps -eo pid,args 2>/dev/null | grep "systemd-inhibit" | grep "HyprCaffeine" | grep "what=idle" | grep -v grep | awk '{print $1}'); do
+# Fallback: kill sleep inhibitors only
+for pid in $(ps -eo pid,args 2>/dev/null | grep "systemd-inhibit" | grep "HyprCaffeine" | grep "what=sleep" | grep -v grep | awk '{print $1}'); do
     kill "$pid" 2>/dev/null || true
 done
 

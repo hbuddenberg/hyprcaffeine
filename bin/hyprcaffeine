@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HyprCaffeine — Idle inhibition utility for Hyprland
-# Version: 2.0.0
+# Version: 3.0.0
 # Author: HyprCaffeine Contributors
 # License: MIT
 
@@ -11,7 +11,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 LIB_DIR="${SCRIPT_DIR}/../scripts"
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="2.0.0"
+readonly VERSION="3.0.0"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -50,32 +50,38 @@ source "${LIB_DIR}/watcher.sh"
 
 show_help() {
     cat <<EOF
-${APP_NAME} v${VERSION} — Idle inhibition utility for Hyprland
+${APP_NAME} v${VERSION} — Independent idle-inhibition features for Hyprland
 
 USAGE:
     hyprcaffeine [SUBCOMMAND] [OPTIONS]
 
+FEATURES (each independent):
+    Timer/Infinite      Blocks SUSPEND only (not dim/dpms/lock)
+    Keep Display On     Blocks dim + DPMS + lock (persistent across reboots)
+    Block Lid           Blocks lid-close suspend (persistent across reboots)
+
 SUBCOMMANDS:
-    (none)              Show interactive gum menu
-    on [DURATION]       Activate idle inhibition (30m, 2h, infinite)
-    off                 Deactivate idle inhibition only
-    off --all           Deactivate idle + monitor + lid
+    (none)              Show interactive menu
+    on [DURATION]       Activate sleep inhibition (suspend blocker)
+    off                 Deactivate sleep inhibition only
+    off --all           Deactivate all features (sleep + monitor + lid)
     status              Show current state
-    toggle              Toggle idle inhibition on/off
+    toggle              Toggle sleep inhibition on/off
     waybar              Output Waybar-compatible JSON status
     menu                Walker/wofi launcher menu
-    monitor on|off|toggle  Control monitor keep-awake (independent)
-    lid on|off|toggle      Control lid-close inhibit (independent)
+    monitor on|off|toggle  Keep Display On (blocks dim + DPMS)
+    lid on|off|toggle      Block lid-close suspend
     watcher start|stop|status  Auto-activate daemon
 
 DURATION FORMATS:
-    30s, 15m, 2h, infinite, bare number = minutes
+    30s, 15m, 2h, 1:30 (HH:MM), infinite, bare number = minutes
 
 EXAMPLES:
-    hyprcaffeine on 30m            # Idle inhibition for 30 minutes
-    hyprcaffeine on infinite       # Idle inhibition forever
-    hyprcaffeine off               # Stop idle inhibition
-    hyprcaffeine monitor toggle    # Toggle monitor keep-awake
+    hyprcaffeine on 30m            # Block suspend for 30 minutes
+    hyprcaffeine on 1:30           # Block suspend for 1h 30min
+    hyprcaffeine on infinite       # Block suspend forever
+    hyprcaffeine off               # Stop sleep inhibition
+    hyprcaffeine monitor toggle    # Toggle display keep-awake
     hyprcaffeine lid on            # Enable lid-close inhibit
     hyprcaffeine status            # Show all states
 EOF
@@ -94,7 +100,12 @@ parse_duration() {
         *m) echo "$(( ${duration%m} * 60 ))" ;;
         *h) echo "$(( ${duration%h} * 3600 ))" ;;
         *)
-            if [[ "${duration}" =~ ^[0-9]+$ ]]; then
+            # HH:MM format (e.g. 1:30 = 90 minutes = 5400 seconds)
+            if [[ "${duration}" =~ ^([0-9]+):([0-9]{2})$ ]]; then
+                local hours="${BASH_REMATCH[1]}"
+                local minutes="${BASH_REMATCH[2]}"
+                echo "$(( hours * 3600 + minutes * 60 ))"
+            elif [[ "${duration}" =~ ^[0-9]+$ ]]; then
                 echo "$(( duration * 60 ))"
             else
                 echo "-1"
@@ -141,7 +152,7 @@ do_on() {
         human_duration="$(timer_human "${duration_seconds}")"
     fi
 
-    notify_send "${ICON_ACTIVE} Caffeine Active" "Idle inhibition: ${human_duration}"
+    notify_send "${ICON_ACTIVE} Caffeine Active" "Sleep inhibition: ${human_duration}"
     echo "${ICON_ACTIVE} Caffeine activated — duration: ${human_duration}"
 }
 
