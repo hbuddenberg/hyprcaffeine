@@ -26,8 +26,8 @@ MENU_ITEMS=(
     "󱎫 Custom..."
     "󰜉 Infinite"
     "────────────────────────"
-    "󰍹 Keep Display On  ${MON}"
-    "󰍺 Block Lid         ${LID}"
+    "󰍹 Keep Display On   ${MON}"
+    "󰍺 Block Lid           ${LID}"
 )
 
 # If idle is active, add "Turn Off" at the bottom
