@@ -368,7 +368,7 @@ do_waybar() {
     if [[ ${#tooltip_parts[@]} -eq 0 ]]; then
         tooltip="☕ Caffeine: Inactive"
     else
-        tooltip="$(printf '%s\n' "${tooltip_parts[@]}")"
+        tooltip="$(IFS=' | '; echo "${tooltip_parts[*]}")"
     fi
 
     # ── CSS class based on toggle combination ──
