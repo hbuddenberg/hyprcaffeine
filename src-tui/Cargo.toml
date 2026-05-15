@@ -1,0 +1,22 @@
+[package]
+name = "hyprcaffeine-tui"
+version = "2.0.0"
+edition = "2021"
+description = "Premium TUI dashboard for HyprCaffeine"
+authors = ["HyprCaffeine Contributors"]
+license = "MIT"
+
+[dependencies]
+ratatui = "0.29"
+crossterm = "0.28"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+chrono = "0.4"
+clap = { version = "4", features = ["derive"] }
+dirs = "6"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true

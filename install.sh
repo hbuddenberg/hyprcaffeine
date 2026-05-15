@@ -287,7 +287,7 @@ do_install() {
     elevated_chmod 755 "${BIN_DIR}/hyprcaffeine"
 
     # Patch the LIB_DIR so the binary finds its libraries at the installed location
-    patch_binary_lib_path "${BIN_DIR}/hyprcaffeine" "${DATA_DIR}"
+    patch_binary_lib_path "${BIN_DIR}/hyprcaffeine" "${DATA_DIR}/scripts"
     success "Binary installed → ${BIN_DIR}/hyprcaffeine"
 
     # 3. Install script libraries
@@ -295,15 +295,17 @@ do_install() {
     if [[ -d "${SRC_SCRIPTS}" ]]; then
         # Clean old scripts to avoid stale files
         if [[ "${INSTALL_MODE}" == "system" ]] && [[ "$(id -u)" -ne 0 ]]; then
-            sudo rm -f "${DATA_DIR}"/*.sh
-            sudo cp -r "${SRC_SCRIPTS}/."* "${DATA_DIR}/"
+            sudo rm -f "${DATA_DIR}"/*.sh 2>/dev/null
+            sudo mkdir -p "${DATA_DIR}/scripts"
+            sudo cp "${SRC_SCRIPTS}"/*.sh "${DATA_DIR}/scripts/"
         else
-            rm -f "${DATA_DIR}"/*.sh
-            cp -r "${SRC_SCRIPTS}/."* "${DATA_DIR}/"
+            rm -f "${DATA_DIR}"/*.sh 2>/dev/null
+            mkdir -p "${DATA_DIR}/scripts"
+            cp "${SRC_SCRIPTS}"/*.sh "${DATA_DIR}/scripts/"
         fi
         local count
-        count=$(find "${DATA_DIR}" -name "*.sh" | wc -l)
-        success "Scripts installed → ${DATA_DIR}/ (${count} files)"
+        count=$(find "${DATA_DIR}/scripts" -name "*.sh" | wc -l)
+        success "Scripts installed → ${DATA_DIR}/scripts/ (${count} files)"
     fi
 
     # 4. Install default config (only if none exists)

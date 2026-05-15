@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HyprCaffeine — Idle inhibition utility for Hyprland
-# Version: 1.1.0
+# Version: 2.0.0
 # Author: HyprCaffeine Contributors
 # License: MIT
 
@@ -11,7 +11,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 LIB_DIR="${SCRIPT_DIR}/../scripts"
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="1.1.0"
+readonly VERSION="2.0.0"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -26,12 +26,13 @@ readonly CLR_GREEN="#a6e3a1"
 readonly CLR_RED="#f38ba8"
 readonly CLR_YELLOW="#f9e2af"
 
-# ── Nerd Font Icons ──────────────────────────────────────────────────────────
-readonly ICON_ACTIVE="󰒲"
-readonly ICON_INACTIVE="☕"
+# ── Nerd Font Icons (Material Design) ────────────────────────────────────────
+source "${LIB_DIR}/icons.sh"
+readonly ICON_ACTIVE="${NF_COFFEE}"
+readonly ICON_INACTIVE="${NF_COFFEE_OUTLINE}"
 readonly ICON_INFINITE="∞"
-readonly ICON_MONITOR="🖥"
-readonly ICON_LID="🕮"
+readonly ICON_MONITOR=""
+readonly ICON_LID=""
 
 # ── State Directory ──────────────────────────────────────────────────────────
 readonly STATE_DIR="${HOME}/.cache/hyprcaffeine"
@@ -55,40 +56,28 @@ USAGE:
     hyprcaffeine [SUBCOMMAND] [OPTIONS]
 
 SUBCOMMANDS:
-    (none)              Show interactive gum menu with timer presets
-    on [DURATION]       Activate idle inhibition (e.g., 30m, 2h, infinite)
-    off                 Deactivate all inhibition and features
-    status              Show current inhibition state
-    toggle              Toggle inhibition on/off
+    (none)              Show interactive gum menu
+    on [DURATION]       Activate idle inhibition (30m, 2h, infinite)
+    off                 Deactivate idle inhibition only
+    off --all           Deactivate idle + monitor + lid
+    status              Show current state
+    toggle              Toggle idle inhibition on/off
     waybar              Output Waybar-compatible JSON status
-    menu                Premium launcher mode (walker/wofi)
-    watcher start       Start the auto-activate watcher daemon
-    watcher stop        Stop the watcher daemon
-    watcher status      Show watcher daemon status
+    menu                Walker/wofi launcher menu
+    monitor on|off|toggle  Control monitor keep-awake (independent)
+    lid on|off|toggle      Control lid-close inhibit (independent)
+    watcher start|stop|status  Auto-activate daemon
 
-FEATURE FLAGS (use with 'on'):
-    --monitor           Keep monitor on (force DPMS on, prevent screen blank)
-    --lid               Inhibit lid-close suspend (block systemd lid switch)
-    --auto              Mark as auto-activated (used internally by watcher)
-
-OPTIONS:
-    --help              Show this help message
-    --version           Show version information
+DURATION FORMATS:
+    30s, 15m, 2h, infinite, bare number = minutes
 
 EXAMPLES:
-    hyprcaffeine                      # Interactive menu
-    hyprcaffeine on 30m               # Inhibit idle for 30 minutes
-    hyprcaffeine on 2h                # Inhibit idle for 2 hours
-    hyprcaffeine on infinite          # Inhibit indefinitely
-    hyprcaffeine on 30m --monitor     # Inhibit idle + keep monitor on
-    hyprcaffeine on 2h --monitor --lid # Full: idle + monitor + lid inhibit
-    hyprcaffeine on infinite --lid    # Infinite idle + lid inhibit
-    hyprcaffeine off                  # Stop all inhibition
-    hyprcaffeine status               # Check current state
-    hyprcaffeine toggle               # Toggle on/off
-    hyprcaffeine waybar               # Waybar module output
-    hyprcaffeine watcher start        # Start auto-activate daemon
-    hyprcaffeine watcher status       # Check watcher status
+    hyprcaffeine on 30m            # Idle inhibition for 30 minutes
+    hyprcaffeine on infinite       # Idle inhibition forever
+    hyprcaffeine off               # Stop idle inhibition
+    hyprcaffeine monitor toggle    # Toggle monitor keep-awake
+    hyprcaffeine lid on            # Enable lid-close inhibit
+    hyprcaffeine status            # Show all states
 EOF
 }
 
@@ -96,347 +85,261 @@ show_version() {
     echo "${APP_NAME} v${VERSION}"
 }
 
-# ── Parse feature flags from arguments ──────────────────────────────────────
-# Consumes --monitor, --lid, --auto from remaining args, returns duration
-parse_on_args() {
-    local args=("$@")
-    FEATURE_MONITOR=false
-    FEATURE_LID=false
-    FEATURE_AUTO=false
-    FEATURE_DURATION="infinite"
-
-    for arg in "${args[@]}"; do
-        case "${arg}" in
-            --monitor)
-                FEATURE_MONITOR=true
-                ;;
-            --lid)
-                FEATURE_LID=true
-                ;;
-            --auto)
-                FEATURE_AUTO=true
-                ;;
-            --*)
-                echo "Error: Unknown flag '${arg}'" >&2
-                exit 1
-                ;;
-            *)
-                FEATURE_DURATION="${arg}"
-                ;;
-        esac
-    done
+# ── Parse duration string to seconds ────────────────────────────────────────
+parse_duration() {
+    local duration="${1:-infinite}"
+    case "${duration}" in
+        infinite|inf) echo "0" ;;
+        *s) echo "${duration%s}" ;;
+        *m) echo "$(( ${duration%m} * 60 ))" ;;
+        *h) echo "$(( ${duration%h} * 3600 ))" ;;
+        *)
+            if [[ "${duration}" =~ ^[0-9]+$ ]]; then
+                echo "$(( duration * 60 ))"
+            else
+                echo "-1"
+            fi
+            ;;
+    esac
 }
 
 # ── Core Actions ─────────────────────────────────────────────────────────────
 
-do_activate() {
+# Activate idle inhibition (ONLY idle — monitor/lid are independent)
+do_on() {
     local duration="${1:-infinite}"
-    local monitor_flag="${2:-false}"
-    local lid_flag="${3:-false}"
-    local auto_flag="${4:-false}"
     local duration_seconds
+    duration_seconds="$(parse_duration "${duration}")"
 
-    # Parse duration string to seconds
-    case "${duration}" in
-        infinite|inf)
-            duration_seconds=0  # 0 means infinite
-            ;;
-        *s)
-            duration_seconds="${duration%s}"
-            ;;
-        *m)
-            duration_seconds=$(( ${duration%m} * 60 ))
-            ;;
-        *h)
-            duration_seconds=$(( ${duration%h} * 3600 ))
-            ;;
-        *)
-            # Try as raw number of minutes if no suffix
-            if [[ "${duration}" =~ ^[0-9]+$ ]]; then
-                duration_seconds=$(( duration * 60 ))
-            else
-                notify_error "Invalid duration: ${duration}"
-                echo "Error: Invalid duration '${duration}'. Use formats like 30m, 2h, infinite." >&2
-                exit 1
-            fi
-            ;;
-    esac
+    if [[ "${duration_seconds}" -eq -1 ]]; then
+        notify_error "Invalid duration: ${duration}"
+        echo "Error: Invalid duration '${duration}'." >&2
+        exit 1
+    fi
 
-    # ── Activate idle inhibition via hyprctl ──
+    # Activate idle inhibitor
     if [[ "${DRY_RUN}" == true ]]; then
-        echo "[dry-run] hyprctl dispatch idleinhibit on"
+        echo "[dry-run] idle inhibitor ON"
     else
         hypr_idle_inhibit_on || {
             echo "Warning: Could not reach Hyprland — state saved anyway." >&2
         }
     fi
 
-    # ── Activate monitor-on feature ──
-    if [[ "${monitor_flag}" == true ]]; then
-        if [[ "${DRY_RUN}" == true ]]; then
-            echo "[dry-run] hyprctl dispatch dpms on (monitor keep-awake)"
-        else
-            hypr_monitor_on || {
-                echo "Warning: Monitor control failed — continuing without it." >&2
-            }
-        fi
-    fi
+    # Preserve current monitor/lid state
+    local monitor_val lid_val
+    monitor_val="$(state_get_monitor)"
+    lid_val="$(state_get_lid)"
 
-    # ── Activate lid-close inhibit feature ──
-    if [[ "${lid_flag}" == true ]]; then
-        if [[ "${DRY_RUN}" == true ]]; then
-            echo "[dry-run] systemd-inhibit --what=handle-lid-switch --who=HyprCaffeine --why='User requested' --mode=block sleep infinity &"
-        else
-            lid_inhibit_start || {
-                echo "Warning: Lid inhibition failed — continuing without it." >&2
-            }
-        fi
-    fi
-
-    # Build features JSON
-    local features_json
-    features_json="$(state_build_features "true" "${monitor_flag}" "${lid_flag}" "${auto_flag}")"
-
-    # Save state
-    state_save "active" "${duration_seconds}" "" "${features_json}"
+    state_save "active" "${duration_seconds}" "" "${monitor_val}" "${lid_val}"
     timer_start "${duration_seconds}"
 
-    # Build human-readable description
-    local human_duration feature_parts=()
+    local human_duration
     if [[ "${duration_seconds}" -eq 0 ]]; then
         human_duration="${ICON_INFINITE} infinite"
     else
         human_duration="$(timer_human "${duration_seconds}")"
     fi
 
-    [[ "${monitor_flag}" == true ]] && feature_parts+=("${ICON_MONITOR} monitor-on")
-    [[ "${lid_flag}" == true ]] && feature_parts+=("${ICON_LID} lid-inhibit")
-
-    local feature_text=""
-    if [[ ${#feature_parts[@]} -gt 0 ]]; then
-        feature_text=" ($(IFS=', '; echo "${feature_parts[*]}"))"
-    fi
-
-    # Notification
-    notify_send "${ICON_ACTIVE} Caffeine Active" "Idle inhibition enabled for ${human_duration}${feature_text}"
-    echo "${ICON_ACTIVE} Caffeine activated — duration: ${human_duration}${feature_text}"
+    notify_send "${ICON_ACTIVE} Caffeine Active" "Idle inhibition: ${human_duration}"
+    echo "${ICON_ACTIVE} Caffeine activated — duration: ${human_duration}"
 }
 
-do_deactivate() {
-    # Kill any running background timer
+# Deactivate idle inhibition (ONLY idle — monitor/lid stay as they are)
+do_off() {
+    local all="${1:-}"
+
     timer_stop
 
-    # Stop lid inhibitor if running
     if [[ "${DRY_RUN}" == true ]]; then
-        echo "[dry-run] lid_inhibit_stop"
-    else
-        lid_inhibit_stop
-    fi
-
-    # Deactivate idle inhibition via hyprctl
-    if [[ "${DRY_RUN}" == true ]]; then
-        echo "[dry-run] hyprctl dispatch idleinhibit off"
+        echo "[dry-run] idle inhibitor OFF"
     else
         hypr_idle_inhibit_off
     fi
 
-    # Clear state (all features off)
-    state_save "inactive" "0" "" '{"idle":false,"monitor":false,"lid":false,"auto":false}'
-    notify_send "${ICON_INACTIVE} Caffeine Off" "All inhibition disabled"
-    echo "${ICON_INACTIVE} Caffeine deactivated"
-}
-
-do_status() {
-    local state
-    state="$(state_get_status)"
-
-    if [[ "${state}" == "active" ]]; then
-        local remaining duration
-        remaining="$(state_get_remaining)"
-        duration="$(state_get_duration)"
-
-        local status_text=""
-        if [[ "${duration}" == "0" ]]; then
-            status_text="${ICON_ACTIVE} Active — ${ICON_INFINITE} infinite"
-        else
-            status_text="${ICON_ACTIVE} Active — remaining: ${remaining}"
-        fi
-
-        # Append feature flags
-        local features_display
-        features_display="$(state_get_features_display)"
-        if [[ -n "${features_display}" ]]; then
-            status_text="${status_text} ${features_display}"
-        fi
-
-        # Show auto flag
-        local auto_val
-        auto_val="$(state_get_feature auto)"
-        if [[ "${auto_val}" == "true" ]]; then
-            status_text="${status_text} [auto]"
-        fi
-
-        echo "${status_text}"
+    if [[ "${all}" == "--all" ]]; then
+        do_monitor_off
+        do_lid_off
+        state_save "inactive" "0" "" "false" "false"
+        notify_send "${ICON_INACTIVE} Caffeine Off" "All features disabled"
+        echo "${ICON_INACTIVE} All features deactivated"
     else
-        echo "${ICON_INACTIVE} Inactive"
+        # Preserve monitor/lid
+        local monitor_val lid_val
+        monitor_val="$(state_get_monitor)"
+        lid_val="$(state_get_lid)"
+        state_save "inactive" "0" "" "${monitor_val}" "${lid_val}"
+        notify_send "${ICON_INACTIVE} Caffeine Off" "Idle inhibition disabled"
+        echo "${ICON_INACTIVE} Idle inhibition deactivated"
     fi
 }
 
+# Toggle idle inhibition
 do_toggle() {
     local state
     state="$(state_get_status)"
-
     if [[ "${state}" == "active" ]]; then
-        do_deactivate
+        do_off
     else
-        do_activate "infinite" false false
+        do_on "infinite"
     fi
 }
 
-do_waybar() {
-    local state
-    state="$(state_get_status)"
+# ── Monitor (independent toggle) ────────────────────────────────────────────
 
+do_monitor_on() {
+    if [[ "${DRY_RUN}" == true ]]; then
+        echo "[dry-run] monitor keep-awake ON"
+        return
+    fi
+    hypr_monitor_on || {
+        echo "Warning: Monitor control failed." >&2
+        return 1
+    }
+    state_set_monitor "true"
+    echo "${ICON_MONITOR} Monitor keep-awake: ON"
+}
+
+do_monitor_off() {
+    if [[ "${DRY_RUN}" == true ]]; then
+        echo "[dry-run] monitor keep-awake OFF"
+        return
+    fi
+    hypr_monitor_off
+    state_set_monitor "false"
+    echo "${ICON_MONITOR} Monitor keep-awake: OFF"
+}
+
+do_monitor_toggle() {
+    local current
+    current="$(state_get_monitor)"
+    if [[ "${current}" == "true" ]]; then
+        do_monitor_off
+    else
+        do_monitor_on
+    fi
+}
+
+# ── Lid (independent toggle) ────────────────────────────────────────────────
+
+do_lid_on() {
+    if [[ "${DRY_RUN}" == true ]]; then
+        echo "[dry-run] lid inhibit ON"
+        return
+    fi
+    lid_inhibit_start || {
+        echo "Warning: Lid inhibition failed." >&2
+        return 1
+    }
+    state_set_lid "true"
+    echo "${ICON_LID} Lid-close inhibit: ON"
+}
+
+do_lid_off() {
+    if [[ "${DRY_RUN}" == true ]]; then
+        echo "[dry-run] lid inhibit OFF"
+        return
+    fi
+    lid_inhibit_stop
+    state_set_lid "false"
+    echo "${ICON_LID} Lid-close inhibit: OFF"
+}
+
+do_lid_toggle() {
+    local current
+    current="$(state_get_lid)"
+    if [[ "${current}" == "true" ]]; then
+        do_lid_off
+    else
+        do_lid_on
+    fi
+}
+
+# ── Status ───────────────────────────────────────────────────────────────────
+
+do_status() {
+    local state monitor lid parts=()
+
+    state="$(state_get_status)"
+    monitor="$(state_get_monitor)"
+    lid="$(state_get_lid)"
+
+    # Idle status
     if [[ "${state}" == "active" ]]; then
-        local duration
+        local duration remaining
         duration="$(state_get_duration)"
-        local tooltip feature_icons=""
+        remaining="$(state_get_remaining)"
 
         if [[ "${duration}" == "0" ]]; then
-            tooltip="Caffeine: ${ICON_INFINITE} Infinite"
+            parts+=("${ICON_ACTIVE} Idle: ${ICON_INFINITE} infinite")
         else
-            local remaining
-            remaining="$(state_get_remaining)"
-            tooltip="Caffeine: ${remaining} remaining"
+            parts+=("${ICON_ACTIVE} Idle: ${remaining}")
         fi
-
-        # Build feature icons
-        local idle monitor lid
-        idle="$(state_get_feature idle)"
-        monitor="$(state_get_feature monitor)"
-        lid="$(state_get_feature lid)"
-
-        [[ "${monitor}" == "true" ]] && feature_icons="${feature_icons} ${ICON_MONITOR}"
-        [[ "${lid}" == "true" ]] && feature_icons="${feature_icons} ${ICON_LID}"
-
-        local text="${ICON_ACTIVE}${feature_icons}"
-
-        # Escape JSON special characters in tooltip
-        tooltip="$(echo "${tooltip}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-
-        # Waybar JSON output — active state
-        cat <<EOF
-{"text": "${text}", "tooltip": "${tooltip}", "class": "active"}
-EOF
     else
-        # Waybar JSON output — inactive state
-        cat <<EOF
-{"text": "${ICON_INACTIVE}", "tooltip": "Caffeine: Off", "class": "inactive"}
-EOF
+        parts+=("${ICON_INACTIVE} Idle: off")
     fi
+
+    # Monitor
+    if [[ "${monitor}" == "true" ]]; then
+        parts+=("${ICON_MONITOR} Monitor: ON")
+    else
+        parts+=("${ICON_MONITOR} Monitor: off")
+    fi
+
+    # Lid
+    if [[ "${lid}" == "true" ]]; then
+        parts+=("${ICON_LID} Lid: ON")
+    else
+        parts+=("${ICON_LID} Lid: off")
+    fi
+
+    echo "$(IFS=$' · '; echo "${parts[*]}")"
 }
 
-do_menu() {
-    # Premium launcher mode — try walker first, fallback to wofi
-    local launcher=""
-    if command -v walker &>/dev/null; then
-        launcher="walker"
-    elif command -v wofi &>/dev/null; then
-        launcher="wofi"
-    else
-        notify_error "No supported launcher found (walker/wofi)"
-        echo "Error: Install walker or wofi for menu mode." >&2
-        exit 1
-    fi
+# ── Waybar ───────────────────────────────────────────────────────────────────
 
-    local choice
-    case "${launcher}" in
-        walker)
-            choice=$(echo -e "on 15m\non 30m\non 1h\non 2h\non infinite\non infinite --monitor\non infinite --lid\non infinite --monitor --lid\noff\nstatus" | walker -d --prompt="${ICON_INACTIVE} HyprCaffeine" 2>/dev/null)
-            ;;
-        wofi)
-            choice=$(echo -e "☕ 15 minutes\n☕ 30 minutes\n🔥 1 hour\n🔥 2 hours\n♾️ Infinite\n🖥 Infinite + Monitor\n🕮 Infinite + Lid\n🖥🕮 Full (Inf+Mon+Lid)\n❌ Disable" | wofi -d -p "${ICON_INACTIVE} HyprCaffeine" 2>/dev/null)
-            ;;
-    esac
+do_waybar() {
+    local state monitor lid text="" tooltip_parts=() class="inactive"
 
-    [[ -z "${choice}" ]] && exit 0
+    state="$(state_get_status)"
+    monitor="$(state_get_monitor)"
+    lid="$(state_get_lid)"
 
-    # Map menu labels to commands
-    case "${choice}" in
-        "☕ 15 minutes"|"on 15m")                          do_activate "15m" false false     ;;
-        "☕ 30 minutes"|"on 30m")                          do_activate "30m" false false     ;;
-        "🔥 1 hour"|"on 1h")                              do_activate "1h" false false      ;;
-        "🔥 2 hours"|"on 2h")                             do_activate "2h" false false      ;;
-        "♾️ Infinite"|"on infinite")                       do_activate "infinite" false false ;;
-        "🖥 Infinite + Monitor"|"on infinite --monitor")   do_activate "infinite" true false  ;;
-        "🕮 Infinite + Lid"|"on infinite --lid")            do_activate "infinite" false true  ;;
-        "🖥🕮 Full (Inf+Mon+Lid)"|"on infinite --monitor --lid") do_activate "infinite" true true ;;
-        "❌ Disable"|"off")                                do_deactivate                      ;;
-        "status")                                          do_status                          ;;
-    esac
-}
-
-do_interactive_menu() {
-    # Interactive gum menu
-    if ! command -v gum &>/dev/null; then
-        notify_error "gum is required for interactive mode"
-        echo "Error: Install gum for interactive menu (https://github.com/charmbracelet/gum)" >&2
-        exit 1
-    fi
-
-    local header_text
-    header_text="${ICON_INACTIVE} ${APP_NAME}"
-
-    local state
-    state="$(state_get_status 2>/dev/null || echo "inactive")"
+    # Build text
     if [[ "${state}" == "active" ]]; then
-        header_text="${ICON_ACTIVE} ${APP_NAME} (active)"
+        local duration remaining
+        duration="$(state_get_duration)"
+        if [[ "${duration}" == "0" ]]; then
+            text="${ICON_ACTIVE} ∞"
+            tooltip_parts+=("Idle: infinite")
+        else
+            remaining="$(state_get_remaining)"
+            text="${ICON_ACTIVE} ${remaining}"
+            tooltip_parts+=("Idle: ${remaining}")
+        fi
+        class="active"
+    else
+        text="${ICON_INACTIVE}"
     fi
 
-    local choice
-    choice=$(gum choose \
-        --header="${header_text}" \
-        --header.border="rounded" \
-        --header.margin="0 0 1 0" \
-        --cursor="→ " \
-        --cursor.foreground="${CLR_BLUE}" \
-        --selected.foreground="${CLR_GREEN}" \
-        --item.foreground="${CLR_TEXT}" \
-        --border="rounded" \
-        --border.foreground="${CLR_SURFACE}" \
-        --height="13" \
-        "☕ 15 minutos" \
-        "☕ 30 minutos" \
-        "🔥 1 hora" \
-        "🔥 2 horas" \
-        "♾️ Infinito" \
-        "🖥 Infinito + Monitor" \
-        "🕮 Infinito + Lid" \
-        "🖥🕮 Full (Todo)" \
-        "❌ Desactivar" \
-        "🚪 Salir" \
-        2>/dev/null)
+    [[ "${monitor}" == "true" ]] && { text="${text} ${ICON_MONITOR}"; tooltip_parts+=("Monitor: ON"); class="active"; }
+    [[ "${lid}" == "true" ]] && { text="${text} ${ICON_LID}"; tooltip_parts+=("Lid: ON"); class="active"; }
 
-    [[ -z "${choice}" ]] && exit 0
+    local tooltip
+    if [[ ${#tooltip_parts[@]} -eq 0 ]]; then
+        tooltip="Caffeine: Off"
+    else
+        tooltip="$(IFS=', '; echo "${tooltip_parts[*]}")"
+    fi
 
-    case "${choice}" in
-        "☕ 15 minutos")       do_activate "15m" false false     ;;
-        "☕ 30 minutos")       do_activate "30m" false false     ;;
-        "🔥 1 hora")           do_activate "1h" false false      ;;
-        "🔥 2 horas")          do_activate "2h" false false      ;;
-        "♾️ Infinito")         do_activate "infinite" false false ;;
-        "🖥 Infinito + Monitor") do_activate "infinite" true false ;;
-        "🕮 Infinito + Lid")    do_activate "infinite" false true  ;;
-        "🖥🕮 Full (Todo)")     do_activate "infinite" true true   ;;
-        "❌ Desactivar")       do_deactivate                     ;;
-        "🚪 Salir")            exit 0                            ;;
-    esac
+    tooltip="$(echo "${tooltip}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+
+    echo "{\"text\": \"${text}\", \"tooltip\": \"${tooltip}\", \"class\": \"${class}\"}"
 }
 
 # ── Main Entry Point ─────────────────────────────────────────────────────────
 
 main() {
-    # Ensure state directory exists
     mkdir -p "${STATE_DIR}"
 
     local subcommand="${1:-}"
@@ -450,12 +353,10 @@ main() {
             show_version
             ;;
         on)
-            # Parse all arguments (duration + feature flags)
-            parse_on_args "$@"
-            do_activate "${FEATURE_DURATION}" "${FEATURE_MONITOR}" "${FEATURE_LID}" "${FEATURE_AUTO}"
+            do_on "${1:-infinite}"
             ;;
         off)
-            do_deactivate
+            do_off "${1:-}"
             ;;
         status)
             do_status
@@ -467,33 +368,57 @@ main() {
             do_waybar
             ;;
         menu)
-            do_menu
+            # Delegated to caffeine-menu.sh
+            bash "${LIB_DIR}/caffeine-menu.sh"
+            ;;
+        monitor)
+            local action="${1:-toggle}"
+            case "${action}" in
+                on)     do_monitor_on ;;
+                off)    do_monitor_off ;;
+                toggle) do_monitor_toggle ;;
+                *)      echo "Usage: hyprcaffeine monitor <on|off|toggle>" >&2; exit 1 ;;
+            esac
+            ;;
+        lid)
+            local action="${1:-toggle}"
+            case "${action}" in
+                on)     do_lid_on ;;
+                off)    do_lid_off ;;
+                toggle) do_lid_toggle ;;
+                *)      echo "Usage: hyprcaffeine lid <on|off|toggle>" >&2; exit 1 ;;
+            esac
             ;;
         watcher)
             local watcher_action="${1:-}"
             case "${watcher_action}" in
-                start)
-                    watcher_start
-                    ;;
-                stop)
-                    watcher_stop
-                    ;;
-                status)
-                    watcher_status
-                    ;;
-                *)
-                    echo "Usage: hyprcaffeine watcher <start|stop|status>" >&2
-                    exit 1
-                    ;;
+                start)  watcher_start ;;
+                stop)   watcher_stop ;;
+                status) watcher_status ;;
+                *)      echo "Usage: hyprcaffeine watcher <start|stop|status>" >&2; exit 1 ;;
             esac
+            ;;
+        tui|dashboard)
+            # Launch Premium TUI (ratatui)
+            local tui_bin="${HOME}/.local/bin/hyprcaffeine-tui"
+            if [[ -x "${tui_bin}" ]]; then
+                exec "${tui_bin}" "$@"
+            else
+                echo "TUI not installed. Build with: cd src-tui && cargo build --release" >&2
+                exit 1
+            fi
             ;;
         "")
             # No args — interactive gum menu
-            do_interactive_menu
+            if command -v gum &>/dev/null; then
+                bash "${LIB_DIR}/caffeine-menu.sh"
+            else
+                show_help
+            fi
             ;;
         *)
             echo "Unknown command: ${subcommand}" >&2
-            echo "Run 'hyprcaffeine --help' for usage information." >&2
+            echo "Run 'hyprcaffeine --help' for usage." >&2
             exit 1
             ;;
     esac

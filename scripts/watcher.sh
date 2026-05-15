@@ -21,7 +21,15 @@ _watcher_get_socket() {
             return 1
         fi
     fi
-    local socket="/tmp/hypr/${sig}/.socket2.sock"
+    # Try XDG_RUNTIME_DIR first (Hyprland 0.54.x default), then /tmp
+    local xdg_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    local socket="${xdg_dir}/hypr/${sig}/.socket2.sock"
+    if [[ -S "${socket}" ]]; then
+        echo "${socket}"
+        return 0
+    fi
+    # Fallback to /tmp (older Hyprland versions)
+    socket="/tmp/hypr/${sig}/.socket2.sock"
     if [[ -S "${socket}" ]]; then
         echo "${socket}"
         return 0
@@ -356,6 +364,10 @@ watcher_start() {
 # HyprCaffeine Watcher Daemon — auto-generated launcher
 set -uo pipefail
 
+# Preserve Hyprland environment
+export HYPRLAND_INSTANCE_SIGNATURE="${HYPRLAND_INSTANCE_SIGNATURE:-}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-}"
+
 # Source required libraries
 source "${scripts_dir}/watcher.sh"
 source "${scripts_dir}/config.sh"
@@ -369,9 +381,8 @@ DAEMON_EOF
     chmod +x "${daemon_script}"
 
     # Launch as a detached background process
-    setsid bash "${daemon_script}" >/dev/null 2>&1 &
+    ( bash "${daemon_script}" >/dev/null 2>&1 & ) &
     local daemon_pid=$!
-    disown "${daemon_pid}" 2>/dev/null || true
 
     echo "󰒲 Watcher daemon started (PID: ${daemon_pid})"
     echo "   Log: ${WATCHER_LOG_FILE}"

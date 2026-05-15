@@ -18,3 +18,7 @@ Thumbs.db
 *~
 .vscode/
 .idea/
+
+# Rust build
+src-tui/target/
+

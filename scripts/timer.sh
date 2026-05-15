@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# timer.sh — Timer management for HyprCaffeine
-# Part of the HyprCaffeine utility suite
+# timer.sh — Timer management for HyprCaffeine v2.0
+# State format: flat {status, duration, activated_at, pid, monitor, lid}
 
-# Start a background timer that will deactivate caffeine when duration expires
+# Start a background timer that will deactivate idle when duration expires
 # Args: duration_seconds (0 = infinite, no timer started)
 timer_start() {
     local duration_seconds="${1:-0}"
@@ -19,58 +19,74 @@ timer_start() {
     local state_file="${state_dir}/state.json"
     local pid_file="${state_dir}/timer.pid"
 
-    # Resolve the scripts directory for sourcing hyprland.sh
-    local scripts_dir
-    scripts_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-    # Write a standalone timer script and run it fully detached via setsid
+    # Write a standalone timer script and run it fully detached
     local timer_script="${state_dir}/.timer_worker.sh"
-    cat > "${timer_script}" <<EOF
+
+    # Capture current environment for Hyprland connectivity
+    local his="${HYPRLAND_INSTANCE_SIGNATURE:-}"
+    local xdg="${XDG_RUNTIME_DIR:-}"
+
+    cat > "${timer_script}" <<'WORKER_EOF'
 #!/usr/bin/env bash
-sleep ${duration_seconds}
+# HyprCaffeine Timer Worker — auto-generated
+export HYPRLAND_INSTANCE_SIGNATURE="__HIS__"
+export XDG_RUNTIME_DIR="__XDG__"
+export PATH="__PATH__"
 
-# Deactivate idle inhibition
-hyprctl dispatch idleinhibit off 2>/dev/null || true
+sleep __DURATION__
 
-# Stop lid inhibitor if running
-if [[ -f "${state_dir}/lid_inhibit.pid" ]]; then
-    lid_pid="\$(cat "${state_dir}/lid_inhibit.pid" 2>/dev/null)"
-    if [[ -n "\$lid_pid" ]] && kill -0 "\$lid_pid" 2>/dev/null; then
-        kill "\$lid_pid" 2>/dev/null || true
-        pgid="\$(ps -o pgid= -p "\$lid_pid" 2>/dev/null | tr -d ' ')"
-        if [[ -n "\$pgid" ]]; then
-            kill -- -"\$pgid" 2>/dev/null || true
-        fi
-    fi
-    rm -f "${state_dir}/lid_inhibit.pid"
+# Turn off idle only (preserve monitor/lid state)
+if command -v hyprcaffeine &>/dev/null; then
+    hyprcaffeine off 2>>__STATE_DIR__/timer.log || true
 fi
 
-# Write inactive state with all features cleared
-echo '{"status":"inactive","duration":0,"activated_at":"","pid":"","features":{"idle":false,"monitor":false,"lid":false,"auto":false}}' > ${state_file}
+# Fallback: kill idle inhibitors only
+for pid in $(ps -eo pid,args 2>/dev/null | grep "systemd-inhibit" | grep "HyprCaffeine" | grep "what=idle" | grep -v grep | awk '{print $1}'); do
+    kill "$pid" 2>/dev/null || true
+done
 
-notify-send -a HyprCaffeine '☕ Caffeine Expired' 'Idle inhibition timer ended' 2>/dev/null || true
-rm -f ${pid_file}
-rm -f ${timer_script}
-EOF
+# Read current monitor/lid state and preserve it
+STATE_FILE="__STATE_DIR__/state.json"
+MONITOR="false"
+LID="false"
+if [[ -f "$STATE_FILE" ]]; then
+    MONITOR=$(grep -oP '"monitor"\s*:\s*\K(true|false)' "$STATE_FILE" 2>/dev/null || echo "false")
+    LID=$(grep -oP '"lid"\s*:\s*\K(true|false)' "$STATE_FILE" 2>/dev/null || echo "false")
+fi
+
+echo "{\"status\":\"inactive\",\"duration\":0,\"activated_at\":\"\",\"pid\":\"\",\"monitor\":${MONITOR},\"lid\":${LID}}" > "$STATE_FILE"
+rm -f __STATE_DIR__/idle_inhibit.pid __STATE_DIR__/timer.pid
+rm -f __STATE_DIR__/.timer_worker.sh
+WORKER_EOF
+
+    # Inject real values via sed
+    sed -i \
+        -e "s|__HIS__|${his}|g" \
+        -e "s|__XDG__|${xdg}|g" \
+        -e "s|__DURATION__|${duration_seconds}|g" \
+        -e "s|__STATE_DIR__|${state_dir}|g" \
+        -e "s|__PATH__|${PATH}|g" \
+        "${timer_script}"
     chmod +x "${timer_script}"
 
-    # Launch fully detached — setsid creates new session, disowns from process group
-    setsid bash "${timer_script}" >/dev/null 2>&1 &
+    # Launch fully detached
+    ( bash "${timer_script}" >/dev/null 2>&1 & ) &
     local timer_pid=$!
-
     echo "${timer_pid}" > "${pid_file}"
 
-    # Update state file with timer PID
+    # Update state with timer PID (preserve monitor/lid)
     if [[ -f "${state_file}" ]]; then
-        local status duration activated_at features
-        status="$(grep -oP '"status"\s*:\s*"\K[^"]+' "${state_file}" 2>/dev/null || echo "active")"
-        duration="$(grep -oP '"duration"\s*:\s*\K[0-9]+' "${state_file}" 2>/dev/null || echo "0")"
-        activated_at="$(grep -oP '"activated_at"\s*:\s*"\K[^"]+' "${state_file}" 2>/dev/null || echo "")"
-        features="$(grep -oP '"features"\s*:\s*\K\{[^}]+\}' "${state_file}" 2>/dev/null || echo '{"idle":true,"monitor":false,"lid":false}')"
-        echo "{\"status\":\"${status}\",\"duration\":${duration},\"activated_at\":\"${activated_at}\",\"pid\":\"${timer_pid}\",\"features\":${features}}" > "${state_file}"
-    fi
+        local status duration activated_at monitor_val lid_val
+        status="$(sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${state_file}" 2>/dev/null || echo "active")"
+        duration="$(sed -n 's/.*"duration"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p' "${state_file}" 2>/dev/null || echo "0")"
+        activated_at="$(sed -n 's/.*"activated_at"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${state_file}" 2>/dev/null || echo "")"
+        monitor_val="$(sed -n 's/.*"monitor"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "${state_file}" 2>/dev/null || echo "false")"
+        lid_val="$(sed -n 's/.*"lid"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "${state_file}" 2>/dev/null || echo "false")"
 
-    disown "${timer_pid}" 2>/dev/null || true
+        cat > "${state_file}" <<STATEEOF
+{"status":"${status}","duration":${duration},"activated_at":"${activated_at}","pid":"${timer_pid}","monitor":${monitor_val},"lid":${lid_val}}
+STATEEOF
+    fi
 }
 
 # Stop any running timer
@@ -82,14 +98,14 @@ timer_stop() {
         local pid
         pid="$(cat "${pid_file}" 2>/dev/null || echo "")"
         if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
-            kill "${pid}" 2>/dev/null || true
+            kill -- -"$(ps -o pgid= -p "${pid}" 2>/dev/null | tr -d ' ')" 2>/dev/null || \
+                kill "${pid}" 2>/dev/null || true
         fi
         rm -f "${pid_file}"
     fi
 }
 
 # Convert seconds to human-readable duration string
-# Args: seconds
 timer_human() {
     local seconds="${1:-0}"
 
@@ -103,15 +119,9 @@ timer_human() {
     local secs=$(( seconds % 60 ))
 
     local parts=()
-    if [[ "${hours}" -gt 0 ]]; then
-        parts+=("${hours}h")
-    fi
-    if [[ "${minutes}" -gt 0 ]]; then
-        parts+=("${minutes}m")
-    fi
-    if [[ "${secs}" -gt 0 ]] && [[ "${hours}" -eq 0 ]]; then
-        parts+=("${secs}s")
-    fi
+    [[ "${hours}" -gt 0 ]] && parts+=("${hours}h")
+    [[ "${minutes}" -gt 0 ]] && parts+=("${minutes}m")
+    [[ "${secs}" -gt 0 ]] && [[ "${hours}" -eq 0 ]] && parts+=("${secs}s")
 
     local result
     result="$(IFS=' '; echo "${parts[*]}")"

@@ -1,11 +1,70 @@
 #!/usr/bin/env bash
 # hyprland.sh — Hyprland-specific helpers for HyprCaffeine
-# Provides monitor control and lid-close inhibition functions.
+# Compatible with Hyprland 0.54.x+
+# Uses systemd-inhibit for idle inhibition (hypridle listens to D-Bus inhibitors)
 
-# ── Monitor DPMS Control ────────────────────────────────────────────────────
+# ── PID Files ─────────────────────────────────────────────────────────────────
+_IDLE_PID_FILE="${HOME}/.cache/hyprcaffeine/idle_inhibit.pid"
+_LID_PID_FILE="${HOME}/.cache/hyprcaffeine/lid_inhibit.pid"
 
-# Force monitor on (prevent DPMS timeout)
-# Uses 'hyprctl dispatch dpms on' to keep the screen awake
+# ── Hyprland Idle Inhibit ─────────────────────────────────────────────────────
+# Hyprland 0.54.x removed `hyprctl dispatch idleinhibit`.
+# The correct approach: systemd-inhibit --what=idle blocks hypridle from triggering.
+# hypridle respects org.freedesktop.ScreenSaver and systemd idle inhibitors.
+
+hypr_idle_inhibit_on() {
+    # Stop any existing inhibitor first
+    hypr_idle_inhibit_off
+
+    if ! command -v systemd-inhibit &>/dev/null; then
+        echo "Warning: systemd-inhibit not found — idle inhibition unavailable." >&2
+        return 1
+    fi
+
+    # Start idle inhibitor in background — blocks hypridle from suspending
+    systemd-inhibit \
+        --what=idle \
+        --who=HyprCaffeine \
+        --why="Caffeine mode active" \
+        --mode=block \
+        sleep infinity &
+
+    local pid=$!
+    echo "${pid}" > "${_IDLE_PID_FILE}"
+    disown "${pid}" 2>/dev/null || true
+
+    return 0
+}
+
+# Kill all HyprCaffeine idle inhibitors (avoid zombie accumulation)
+# Uses ps+grep instead of pkill for broader compatibility
+_kill_all_idle_inhibitors() {
+    local pids
+    pids="$(ps -eo pid,args 2>/dev/null | grep "systemd-inhibit" | grep "HyprCaffeine" | grep "what=idle" | grep -v grep | awk '{print $1}')"
+    for pid in ${pids}; do
+        kill "${pid}" 2>/dev/null || true
+    done
+}
+
+hypr_idle_inhibit_off() {
+    _kill_all_idle_inhibitors
+    rm -f "${_IDLE_PID_FILE}"
+}
+
+# Check if idle inhibitor is running
+hypr_idle_is_active() {
+    if [[ -f "${_IDLE_PID_FILE}" ]]; then
+        local pid
+        pid="$(cat "${_IDLE_PID_FILE}" 2>/dev/null || echo "")"
+        if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# ── Monitor DPMS Control ──────────────────────────────────────────────────────
+
 hypr_monitor_on() {
     if ! command -v hyprctl &>/dev/null; then
         echo "Warning: hyprctl not found — monitor control unavailable." >&2
@@ -19,52 +78,14 @@ hypr_monitor_on() {
     return 0
 }
 
-# Restore monitor to normal DPMS behavior
 hypr_monitor_off() {
-    if ! command -v hyprctl &>/dev/null; then
-        return 0
-    fi
-
-    # No explicit "dpms auto" — Hyprland resumes normal DPMS when idle inhibitor is off
-    hyprctl dispatch dpms on 2>/dev/null || true
+    # DPMS resumes normal behavior when idle inhibitor is off
     return 0
 }
 
-# ── Hyprland Idle Inhibit ───────────────────────────────────────────────────
+# ── Lid Close Inhibition ──────────────────────────────────────────────────────
 
-# Activate Hyprland idle inhibitor
-hypr_idle_inhibit_on() {
-    if ! command -v hyprctl &>/dev/null; then
-        echo "Warning: hyprctl not found — idle inhibition unavailable." >&2
-        return 1
-    fi
-
-    hyprctl dispatch idleinhibit on 2>/dev/null || {
-        echo "Warning: Could not activate idle inhibitor via hyprctl." >&2
-        return 1
-    }
-    return 0
-}
-
-# Deactivate Hyprland idle inhibitor
-hypr_idle_inhibit_off() {
-    if ! command -v hyprctl &>/dev/null; then
-        return 0
-    fi
-
-    hyprctl dispatch idleinhibit off 2>/dev/null || true
-    return 0
-}
-
-# ── Lid Close Inhibition ────────────────────────────────────────────────────
-
-# PID file for the lid inhibitor background process
-_LID_PID_FILE="${HOME}/.cache/hyprcaffeine/lid_inhibit.pid"
-
-# Start lid-close inhibitor via systemd-inhibit
-# Runs 'sleep infinity' in the background, blocked by systemd-inhibit
 lid_inhibit_start() {
-    # Stop any existing lid inhibitor first
     lid_inhibit_stop
 
     if ! command -v systemd-inhibit &>/dev/null; then
@@ -72,7 +93,6 @@ lid_inhibit_start() {
         return 1
     fi
 
-    # Start the inhibitor in background
     systemd-inhibit \
         --what=handle-lid-switch \
         --who=HyprCaffeine \
@@ -87,26 +107,20 @@ lid_inhibit_start() {
     return 0
 }
 
-# Stop lid-close inhibitor (kill the background process)
-lid_inhibit_stop() {
-    if [[ -f "${_LID_PID_FILE}" ]]; then
-        local pid
-        pid="$(cat "${_LID_PID_FILE}" 2>/dev/null || echo "")"
-        if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
-            # Kill the systemd-inhibit process; the sleep child dies with it
-            kill "${pid}" 2>/dev/null || true
-            # Also kill any remaining sleep infinity children
-            local pgid
-            pgid="$(ps -o pgid= -p "${pid}" 2>/dev/null | tr -d ' ')"
-            if [[ -n "${pgid}" ]]; then
-                kill -- -"${pgid}" 2>/dev/null || true
-            fi
-        fi
-        rm -f "${_LID_PID_FILE}"
-    fi
+# Kill all HyprCaffeine lid inhibitors (avoid zombie accumulation)
+_kill_all_lid_inhibitors() {
+    local pids
+    pids="$(ps -eo pid,args 2>/dev/null | grep "systemd-inhibit" | grep "HyprCaffeine" | grep "handle-lid-switch" | grep -v grep | awk '{print $1}')"
+    for pid in ${pids}; do
+        kill "${pid}" 2>/dev/null || true
+    done
 }
 
-# Check if lid inhibitor is running
+lid_inhibit_stop() {
+    _kill_all_lid_inhibitors
+    rm -f "${_LID_PID_FILE}"
+}
+
 lid_inhibit_is_active() {
     if [[ -f "${_LID_PID_FILE}" ]]; then
         local pid
