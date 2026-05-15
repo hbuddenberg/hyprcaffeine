@@ -31,7 +31,7 @@ source "${LIB_DIR}/icons.sh"
 readonly ICON_ACTIVE="${NF_COFFEE}"
 readonly ICON_INACTIVE="${NF_COFFEE_OUTLINE}"
 readonly ICON_TIMER="󱎫"
-readonly ICON_INFINITE="󰜉"
+readonly ICON_INFINITE=""
 readonly ICON_MONITOR="󰍹"
 readonly ICON_LID="󰍺"
 
@@ -148,7 +148,7 @@ do_on() {
 
     local human_duration
     if [[ "${duration_seconds}" -eq 0 ]]; then
-        human_duration="${ICON_INFINITE} infinite"
+        human_duration=" infinite"
     else
         human_duration="$(timer_human "${duration_seconds}")"
     fi
@@ -350,7 +350,7 @@ do_waybar() {
 
     local text="${cup}"
     if [[ ${#action_parts[@]} -gt 0 ]]; then
-        text="${cup} $(IFS=' '; echo "${action_parts[*]}")"
+        text="${cup}  $(IFS=' '; echo "${action_parts[*]}")"
     fi
 
     # ── Build tooltip ──
@@ -359,7 +359,7 @@ do_waybar() {
         tooltip_parts+=("󱎫 Timer: $(state_get_remaining)")
     fi
     if [[ "${infinite_on}" == "true" ]]; then
-        tooltip_parts+=("󰜉 Infinite mode")
+        tooltip_parts+=(" Infinite mode")
     fi
     if [[ "${monitor}" == "true" ]]; then
         tooltip_parts+=("󰍹 Display: ON")
