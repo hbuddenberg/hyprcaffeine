@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# caffeine-menu.sh — Waybar click handler for HyprCaffeine v2.0
-# English base, emojis, descriptive toggles
+# caffeine-menu.sh — Walker/Wofi menu for HyprCaffeine v2.0
+# Always shows menu. When idle active, adds "Turn Off" option.
 
 HYPRCAFFEINE="hyprcaffeine"
 STATE_FILE="${HOME}/.cache/hyprcaffeine/state.json"
@@ -13,15 +13,17 @@ _get_bool() {
 }
 _is_idle_active() { [[ "$(_get_field status)" == "active" ]]; }
 
-if _is_idle_active; then
-    "${HYPRCAFFEINE}" off
-    exit 0
-fi
-
+# Build toggle icons from state
 if [[ "$(_get_bool monitor)" == "true" ]]; then MON="🟢"; else MON="⚫"; fi
 if [[ "$(_get_bool lid)" == "true" ]];     then LID="🟢"; else LID="⚫"; fi
 
-MENU_ITEMS=(
+# Build items — if idle active, add "Turn Off" at top
+MENU_ITEMS=()
+if _is_idle_active; then
+    REMAINING="$(${HYPRCAFFEINE} status 2>/dev/null | grep -oP '\d+m \d+s' | head -1)"
+    MENU_ITEMS+=("⏹ Turn Off (${REMAINING:-active})")
+fi
+MENU_ITEMS+=(
     "☕ 15 min"
     "☕ 30 min"
     "☕ 1 hour"
@@ -49,11 +51,12 @@ fi
 [[ -z "${_choice}" ]] && exit 0
 
 case "${_choice}" in
+    *Turn*Off*|*turn*off*) "${HYPRCAFFEINE}" off ;;
     *15*min*)   "${HYPRCAFFEINE}" on 15m ;;
     *30*min*)   "${HYPRCAFFEINE}" on 30m ;;
     *1*hour*)   "${HYPRCAFFEINE}" on 1h ;;
     *2*hour*)   "${HYPRCAFFEINE}" on 2h ;;
-    *Infinite* | *infinite*) "${HYPRCAFFEINE}" on infinite ;;
-    *Display* | *display*)   "${HYPRCAFFEINE}" monitor toggle ;;
-    *Lid* | *lid*)           "${HYPRCAFFEINE}" lid toggle ;;
+    *Infinite*|*infinite*) "${HYPRCAFFEINE}" on infinite ;;
+    *Display*|*display*)   "${HYPRCAFFEINE}" monitor toggle ;;
+    *Lid*|*lid*)           "${HYPRCAFFEINE}" lid toggle ;;
 esac
