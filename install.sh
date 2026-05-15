@@ -342,7 +342,53 @@ do_install() {
     echo -e "  ${C_TEXT}Run:${C_RESET}  ${C_TEAL}hyprcaffeine --help${C_RESET}"
     echo -e "  ${C_TEXT}Quick:${C_RESET} ${C_TEAL}hyprcaffeine on 30m${C_RESET}"
 
-    # 7. Waybar integration hint
+    # 7. Install Walker theme (if walker is present)
+    if command -v walker &>/dev/null; then
+        step "Installing Walker theme (Omarchy-native style)..."
+        local WALKER_THEME_DIR="${HOME}/.config/walker/themes/caffeine"
+        local SRC_THEME_DIR="${SCRIPT_DIR}/themes/walker/caffeine"
+        if [[ -d "${SRC_THEME_DIR}" ]]; then
+            mkdir -p "${WALKER_THEME_DIR}"
+            cp "${SRC_THEME_DIR}/style.css" "${WALKER_THEME_DIR}/style.css"
+            [[ -f "${SRC_THEME_DIR}/layout.xml" ]] && cp "${SRC_THEME_DIR}/layout.xml" "${WALKER_THEME_DIR}/layout.xml"
+            [[ -f "${SRC_THEME_DIR}/item_dmenu.xml" ]] && cp "${SRC_THEME_DIR}/item_dmenu.xml" "${WALKER_THEME_DIR}/item_dmenu.xml"
+            success "Walker theme → ${WALKER_THEME_DIR}/"
+
+            # Update walker config to use caffeine theme (create if missing)
+            local WALKER_CONFIG="${HOME}/.config/walker/config.toml"
+            if [[ ! -f "${WALKER_CONFIG}" ]]; then
+                cat > "${WALKER_CONFIG}" << 'WALKER_CONF'
+theme = "caffeine"
+force_keyboard_focus = false
+close_when_open = true
+click_to_close = true
+as_window = false
+single_click_activation = true
+selection_wrap = false
+disable_mouse = false
+hide_action_hints_dmenu = true
+
+[shell]
+exclusive_zone = -1
+layer = "overlay"
+anchor_top = true
+anchor_bottom = true
+anchor_left = true
+anchor_right = true
+WALKER_CONF
+                success "Walker config → ${WALKER_CONFIG}"
+            else
+                note "Walker config exists at ${WALKER_CONFIG} — preserved"
+                note "Make sure theme = \"caffeine\" is set in config.toml"
+            fi
+        else
+            note "No Walker theme found in source — skipping"
+        fi
+    else
+        note "Walker not found — skipping theme install"
+    fi
+
+    # 8. Waybar integration hint
     header "Waybar Integration"
     echo -e "  ${C_TEXT}Add to your Waybar config:${C_RESET}"
     echo ""

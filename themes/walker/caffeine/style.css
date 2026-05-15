@@ -1,0 +1,89 @@
+/* Walker — HyprCaffeine Theme (Omarchy-native style) */
+/* Matches Omarchy: dark navy, gray border, clean spacing, no radius */
+
+@define-color selected-text #697b91;
+@define-color text #F8FCE6;
+@define-color base #000311;
+@define-color border #61646a;
+@define-color foreground #F8FCE6;
+@define-color background #000311;
+
+* {
+  all: unset;
+}
+
+* {
+  font-family: monospace;
+  font-size: 18px;
+  color: @text;
+}
+
+scrollbar {
+  opacity: 0;
+}
+
+.normal-icons {
+  -gtk-icon-size: 16px;
+}
+
+.large-icons {
+  -gtk-icon-size: 32px;
+}
+
+.box-wrapper {
+  background: @base;
+  padding: 20px;
+  border: 2px solid @border;
+  border-radius: 0px;
+}
+
+.search-container {
+  background: @base;
+  padding: 10px;
+}
+
+.input placeholder {
+  opacity: 0.5;
+}
+
+.input:focus,
+.input:active {
+  box-shadow: none;
+  outline: none;
+}
+
+child:selected .item-box * {
+  color: @selected-text;
+}
+
+child:selected {
+  background: alpha(@text, 0.07);
+}
+
+.item-box {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.item-text-box {
+  all: unset;
+  padding: 14px 0;
+}
+
+.item-subtext {
+  font-size: 0px;
+  min-height: 0px;
+  margin: 0px;
+  padding: 0px;
+}
+
+.item-image {
+  margin-right: 14px;
+  -gtk-icon-transform: scale(0.9);
+}
+
+.keybind-hints {
+  background: @background;
+  padding: 10px;
+  margin-top: 10px;
+}
