@@ -26,7 +26,7 @@ MENU_ITEMS=(
     "󱎫 Custom..."
     "󰜉 Infinite"
     "────────────────────────"
-    "󰍹 Keep Display On   ${MON}"
+    "󰍹 Keep Display On    ${MON}"
     "󰍺 Block Lid          ${LID}"
 )
 
