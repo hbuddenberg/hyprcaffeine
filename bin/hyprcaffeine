@@ -30,9 +30,10 @@ readonly CLR_YELLOW="#f9e2af"
 source "${LIB_DIR}/icons.sh"
 readonly ICON_ACTIVE="${NF_COFFEE}"
 readonly ICON_INACTIVE="${NF_COFFEE_OUTLINE}"
-readonly ICON_INFINITE="∞"
-readonly ICON_MONITOR=""
-readonly ICON_LID=""
+readonly ICON_TIMER="󱎫"
+readonly ICON_INFINITE="󰜉"
+readonly ICON_MONITOR="󰍹"
+readonly ICON_LID="󰍺"
 
 # ── State Directory ──────────────────────────────────────────────────────────
 readonly STATE_DIR="${HOME}/.cache/hyprcaffeine"
@@ -310,42 +311,93 @@ do_status() {
 # ── Waybar ───────────────────────────────────────────────────────────────────
 
 do_waybar() {
-    local state monitor lid text="" tooltip_parts=() class="inactive"
+    local state monitor lid duration
+    local timer_on="false" infinite_on="false"
 
     state="$(state_get_status)"
     monitor="$(state_get_monitor)"
     lid="$(state_get_lid)"
+    duration="$(state_get_duration)"
 
-    # Build text
     if [[ "${state}" == "active" ]]; then
-        local duration remaining
-        duration="$(state_get_duration)"
-        if [[ "${duration}" == "0" ]]; then
-            text="${ICON_ACTIVE} ∞"
-            tooltip_parts+=("Idle: infinite")
+        if [[ "${duration}" -eq 0 ]]; then
+            infinite_on="true"
         else
-            remaining="$(state_get_remaining)"
-            text="${ICON_ACTIVE} ${remaining}"
-            tooltip_parts+=("Idle: ${remaining}")
+            timer_on="true"
         fi
-        class="active"
-    else
-        text="${ICON_INACTIVE}"
     fi
 
-    [[ "${monitor}" == "true" ]] && { text="${text} ${ICON_MONITOR}"; tooltip_parts+=("Monitor: ON"); class="active"; }
-    [[ "${lid}" == "true" ]] && { text="${text} ${ICON_LID}"; tooltip_parts+=("Lid: ON"); class="active"; }
+    # ── Build text ──
+    local parts=()
+    if [[ "${timer_on}" == "true" ]]; then
+        parts+=("${ICON_TIMER} $(state_get_remaining)")
+    fi
+    if [[ "${infinite_on}" == "true" ]]; then
+        parts+=("${ICON_INFINITE}")
+    fi
+    if [[ "${monitor}" == "true" ]]; then
+        parts+=("${ICON_MONITOR}")
+    fi
+    if [[ "${lid}" == "true" ]]; then
+        parts+=("${ICON_LID}")
+    fi
+
+    local text
+    if [[ ${#parts[@]} -eq 0 ]]; then
+        text="${ICON_INACTIVE}"
+    else
+        text="$(IFS=' '; echo "${parts[*]}")"
+    fi
+
+    # ── Build tooltip ──
+    local tooltip_parts=()
+    if [[ "${timer_on}" == "true" ]]; then
+        tooltip_parts+=("󱎫 Timer: $(state_get_remaining)")
+    fi
+    if [[ "${infinite_on}" == "true" ]]; then
+        tooltip_parts+=("󰜉 Infinite mode")
+    fi
+    if [[ "${monitor}" == "true" ]]; then
+        tooltip_parts+=("󰍹 Display: ON")
+    fi
+    if [[ "${lid}" == "true" ]]; then
+        tooltip_parts+=("󰍺 Lid: Blocked")
+    fi
 
     local tooltip
     if [[ ${#tooltip_parts[@]} -eq 0 ]]; then
-        tooltip="Caffeine: Off"
+        tooltip="☕ Caffeine: Inactive"
     else
-        tooltip="$(IFS=', '; echo "${tooltip_parts[*]}")"
+        tooltip="$(printf '%s\n' "${tooltip_parts[@]}")"
+    fi
+
+    # ── CSS class based on toggle combination ──
+    local class="hc-off"
+    local has_timer="false"
+    [[ "${timer_on}" == "true" || "${infinite_on}" == "true" ]] && has_timer="true"
+
+    if [[ "${has_timer}" == "true" && "${monitor}" == "true" && "${lid}" == "true" ]]; then
+        class="hc-all"
+    elif [[ "${has_timer}" == "true" && "${monitor}" == "true" ]]; then
+        class="hc-timer-monitor"
+    elif [[ "${has_timer}" == "true" && "${lid}" == "true" ]]; then
+        class="hc-timer-lid"
+    elif [[ "${monitor}" == "true" && "${lid}" == "true" ]]; then
+        class="hc-monitor-lid"
+    elif [[ "${timer_on}" == "true" ]]; then
+        class="hc-timer"
+    elif [[ "${infinite_on}" == "true" ]]; then
+        class="hc-infinite"
+    elif [[ "${monitor}" == "true" ]]; then
+        class="hc-monitor"
+    elif [[ "${lid}" == "true" ]]; then
+        class="hc-lid"
     fi
 
     tooltip="$(echo "${tooltip}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
 
-    echo "{\"text\": \"${text}\", \"tooltip\": \"${tooltip}\", \"class\": \"${class}\"}"
+    printf '{"text":"%s","tooltip":"%s","class":"%s"}\n' \
+        "${text}" "${tooltip}" "${class}"
 }
 
 # ── Main Entry Point ─────────────────────────────────────────────────────────
