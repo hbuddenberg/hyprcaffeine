@@ -327,26 +327,30 @@ do_waybar() {
         fi
     fi
 
-    # ── Build text ──
-    local parts=()
-    if [[ "${timer_on}" == "true" ]]; then
-        parts+=("${ICON_TIMER} $(state_get_remaining)")
-    fi
+    # ── Build text ── cup always first, then action icons
+    local any_active="false"
+    [[ "${timer_on}" == "true" || "${infinite_on}" == "true" || "${monitor}" == "true" || "${lid}" == "true" ]] && any_active="true"
+
+    local cup="${ICON_INACTIVE}"
+    [[ "${any_active}" == "true" ]] && cup="${ICON_ACTIVE}"
+
+    local action_parts=()
     if [[ "${infinite_on}" == "true" ]]; then
-        parts+=("${ICON_INFINITE}")
+        action_parts+=("${ICON_INFINITE}")
+    fi
+    if [[ "${timer_on}" == "true" ]]; then
+        action_parts+=("${ICON_TIMER} $(state_get_remaining)")
     fi
     if [[ "${monitor}" == "true" ]]; then
-        parts+=("${ICON_MONITOR}")
+        action_parts+=("${ICON_MONITOR}")
     fi
     if [[ "${lid}" == "true" ]]; then
-        parts+=("${ICON_LID}")
+        action_parts+=("${ICON_LID}")
     fi
 
-    local text
-    if [[ ${#parts[@]} -eq 0 ]]; then
-        text="${ICON_INACTIVE}"
-    else
-        text="$(IFS=' '; echo "${parts[*]}")"
+    local text="${cup}"
+    if [[ ${#action_parts[@]} -gt 0 ]]; then
+        text="${cup} $(IFS=' '; echo "${action_parts[*]}")"
     fi
 
     # ── Build tooltip ──
