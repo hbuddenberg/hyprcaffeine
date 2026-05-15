@@ -342,31 +342,7 @@ do_install() {
     echo -e "  ${C_TEXT}Run:${C_RESET}  ${C_TEAL}hyprcaffeine --help${C_RESET}"
     echo -e "  ${C_TEXT}Quick:${C_RESET} ${C_TEAL}hyprcaffeine on 30m${C_RESET}"
 
-    # 7. Install Walker theme (if walker is present)
-    if command -v walker &>/dev/null; then
-        step "Installing Walker theme (Omarchy-native style)..."
-        local WALKER_THEME_DIR="${HOME}/.config/walker/themes/caffeine"
-        local SRC_THEME_DIR="${SCRIPT_DIR}/themes/walker/caffeine"
-        if [[ -d "${SRC_THEME_DIR}" ]]; then
-            mkdir -p "${WALKER_THEME_DIR}"
-            cp "${SRC_THEME_DIR}/style.css" "${WALKER_THEME_DIR}/style.css"
-            [[ -f "${SRC_THEME_DIR}/layout.xml" ]] && cp "${SRC_THEME_DIR}/layout.xml" "${WALKER_THEME_DIR}/layout.xml"
-            [[ -f "${SRC_THEME_DIR}/item_dmenu.xml" ]] && cp "${SRC_THEME_DIR}/item_dmenu.xml" "${WALKER_THEME_DIR}/item_dmenu.xml"
-            success "Walker theme → ${WALKER_THEME_DIR}/"
-
-            # NOTE: We do NOT modify walker config.toml globally.
-            # The caffeine-menu.sh script passes --theme=caffeine explicitly,
-            # so Walker uses our theme only for the caffeine menu, not globally.
-            # Changing the global theme would break Omarchy's Elephant integration.
-            note "Theme activated via --theme=caffeine in caffeine-menu.sh (not global)"
-        else
-            note "No Walker theme found in source — skipping"
-        fi
-    else
-        note "Walker not found — skipping theme install"
-    fi
-
-    # 8. Waybar integration hint
+    # 7. Waybar integration hint
     header "Waybar Integration"
     echo -e "  ${C_TEXT}Add to your Waybar config:${C_RESET}"
     echo ""
