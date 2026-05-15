@@ -354,33 +354,11 @@ do_install() {
             [[ -f "${SRC_THEME_DIR}/item_dmenu.xml" ]] && cp "${SRC_THEME_DIR}/item_dmenu.xml" "${WALKER_THEME_DIR}/item_dmenu.xml"
             success "Walker theme → ${WALKER_THEME_DIR}/"
 
-            # Update walker config to use caffeine theme (create if missing)
-            local WALKER_CONFIG="${HOME}/.config/walker/config.toml"
-            if [[ ! -f "${WALKER_CONFIG}" ]]; then
-                cat > "${WALKER_CONFIG}" << 'WALKER_CONF'
-theme = "caffeine"
-force_keyboard_focus = false
-close_when_open = true
-click_to_close = true
-as_window = false
-single_click_activation = true
-selection_wrap = false
-disable_mouse = false
-hide_action_hints_dmenu = true
-
-[shell]
-exclusive_zone = -1
-layer = "overlay"
-anchor_top = true
-anchor_bottom = true
-anchor_left = true
-anchor_right = true
-WALKER_CONF
-                success "Walker config → ${WALKER_CONFIG}"
-            else
-                note "Walker config exists at ${WALKER_CONFIG} — preserved"
-                note "Make sure theme = \"caffeine\" is set in config.toml"
-            fi
+            # NOTE: We do NOT modify walker config.toml globally.
+            # The caffeine-menu.sh script passes --theme=caffeine explicitly,
+            # so Walker uses our theme only for the caffeine menu, not globally.
+            # Changing the global theme would break Omarchy's Elephant integration.
+            note "Theme activated via --theme=caffeine in caffeine-menu.sh (not global)"
         else
             note "No Walker theme found in source — skipping"
         fi
