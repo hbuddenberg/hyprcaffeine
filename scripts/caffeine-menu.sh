@@ -45,7 +45,7 @@ MENU_TEXT="${MENU_TEXT%\\\\n}"
 
 _choice=""
 if command -v walker &>/dev/null; then
-    _choice=$(echo -e "${MENU_TEXT}" | walker -d -N -H --placeholder="☕ Caffeine" --maxheight=700 2>/dev/null)
+    _choice=$(echo -e "${MENU_TEXT}" | walker -d -N -H --placeholder="☕ Caffeine" --maxheight=700 -w 350 2>/dev/null)
 elif command -v wofi &>/dev/null; then
     _choice=$(echo -e "${MENU_TEXT}" | wofi -d -p "☕ Caffeine" -W 320 -h 320 --cache-file=/dev/null 2>/dev/null)
 elif command -v gum &>/dev/null; then
