@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # caffeine-menu.sh — Walker/Wofi menu for HyprCaffeine v3.0
-# Features: Timer presets, Custom duration, Infinite, Keep Display On, Block Lid
+# Uses Nerd Font icons (monospace-width) for proper alignment
 
 HYPRCAFFEINE="hyprcaffeine"
 STATE_FILE="${HOME}/.cache/hyprcaffeine/state.json"
@@ -13,30 +13,28 @@ _get_bool() {
 }
 _is_idle_active() { [[ "$(_get_field status)" == "active" ]]; }
 
-# Build toggle icons from state
-if [[ "$(_get_bool monitor)" == "true" ]]; then MON="🟢"; else MON="⚫"; fi
-if [[ "$(_get_bool lid)" == "true" ]];     then LID="🟢"; else LID="⚫"; fi
+# Build toggle indicators from state
+if [[ "$(_get_bool monitor)" == "true" ]]; then MON="●"; else MON="○"; fi
+if [[ "$(_get_bool lid)" == "true" ]];     then LID="●"; else LID="○"; fi
 
-# Build items — timer presets
+# Build items — Nerd Font icons for monospace alignment
 MENU_ITEMS=(
-    "☕ 15 min"
-    "☕ 30 min"
-    "☕ 1 hour"
-    "☕ 2 hours"
-    "⏱ Custom..."
-    "♾️ Infinite"
+    "󱎫 15 min"
+    "󱎫 30 min"
+    "󱎫 1 hour"
+    "󱎫 2 hours"
+    "󱎫 Custom..."
+    "󰜉 Infinite"
+    "────────────────────────"
+    "󰍹 Keep Display On  ${MON}"
+    "󰍺 Block Lid         ${LID}"
 )
-
-# Separator + toggle items
-MENU_ITEMS+=("─────────────────────")
-MENU_ITEMS+=("🖥 Keep Display On    [${MON}]")
-MENU_ITEMS+=("📱 Block Lid          [${LID}]")
 
 # If idle is active, add "Turn Off" at the bottom
 if _is_idle_active; then
-    REMAINING="$(${HYPRCAFFEINE} status 2>/dev/null | grep -oP '\d+m \d+s' | head -1)"
-    MENU_ITEMS+=("─────────────────────")
-    MENU_ITEMS+=("⏹ Turn Off (${REMAINING:-active})")
+    REMAINING="$(${HYPRCAFFEINE} status 2>/dev/null | grep -oP '\d+h? ?\d*m' | head -1)"
+    MENU_ITEMS+=("────────────────────────")
+    MENU_ITEMS+=("󰾪 Turn Off (${REMAINING:-active})")
 fi
 
 MENU_TEXT=""
@@ -62,11 +60,11 @@ case "${_choice}" in
         # Re-open Walker in input-only mode for custom duration
         _custom_duration=""
         if command -v walker &>/dev/null; then
-            _custom_duration=$(walker -d -I --placeholder="⏱ Duration (e.g. 1:30 or 90m)" 2>/dev/null)
+            _custom_duration=$(walker -d -I --placeholder="Duration (1:30 or 45m)" 2>/dev/null)
         elif command -v wofi &>/dev/null; then
-            _custom_duration=$(wofi -d -p "⏱ Duration (e.g. 1:30 or 90m)" --cache-file=/dev/null 2>/dev/null)
+            _custom_duration=$(wofi -d -p "Duration (1:30 or 45m)" --cache-file=/dev/null 2>/dev/null)
         elif command -v gum &>/dev/null; then
-            _custom_duration=$(gum input --placeholder="Duration (e.g. 1:30 or 90m)" 2>/dev/null)
+            _custom_duration=$(gum input --placeholder="Duration (1:30 or 45m)" 2>/dev/null)
         fi
         [[ -z "${_custom_duration}" ]] && exit 0
         "${HYPRCAFFEINE}" on "${_custom_duration}"
