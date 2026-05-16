@@ -34,7 +34,11 @@ readonly ICON_TIMER="󱎫"
 readonly ICON_INFINITE="${NF_INFINITE}"
 readonly ICON_MONITOR="󰍹"
 readonly ICON_LID="󰍺"
-
+readonly WB_COFFEE="☕"
+readonly WB_LOOP="∞"
+readonly WB_TIMER="⏱"
+readonly WB_MONITOR="🖥"
+readonly WB_LID="💻"
 # ── State Directory ──────────────────────────────────────────────────────────
 readonly STATE_DIR="${HOME}/.cache/hyprcaffeine"
 readonly STATE_FILE="${STATE_DIR}/state.json"
@@ -331,21 +335,21 @@ do_waybar() {
     local any_active="false"
     [[ "${timer_on}" == "true" || "${infinite_on}" == "true" || "${monitor}" == "true" || "${lid}" == "true" ]] && any_active="true"
 
-    local cup="${ICON_INACTIVE}"
-    [[ "${any_active}" == "true" ]] && cup="${ICON_ACTIVE}"
+    local cup="${WB_COFFEE}"
+    [[ "${any_active}" == "true" ]] && cup="${WB_COFFEE}"
 
     local action_parts=()
     if [[ "${infinite_on}" == "true" ]]; then
-        action_parts+=("${ICON_INFINITE}")
+        action_parts+=("${WB_LOOP}")
     fi
     if [[ "${timer_on}" == "true" ]]; then
-        action_parts+=("${ICON_TIMER} $(state_get_remaining)")
+        action_parts+=("${WB_TIMER} $(state_get_remaining)")
     fi
     if [[ "${monitor}" == "true" ]]; then
-        action_parts+=("${ICON_MONITOR}")
+        action_parts+=("${WB_MONITOR}")
     fi
     if [[ "${lid}" == "true" ]]; then
-        action_parts+=("${ICON_LID}")
+        action_parts+=("${WB_LID}")
     fi
 
     local text="${cup}"
