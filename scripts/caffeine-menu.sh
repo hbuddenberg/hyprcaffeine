@@ -24,7 +24,7 @@ MENU_ITEMS=(
     "󱎫 1 hour"
     "󱎫 2 hours"
     "󱎫 Custom..."
-    "󰷀 Infinite"
+    "♾️ Infinite"
     "────────────────────────"
     "󰍹 Keep Display On    ${MON}"
     "󰍺 Block Lid          ${LID}"
