@@ -8,7 +8,14 @@ set -uo pipefail
 
 # ── Path Resolution ──────────────────────────────────────────────────────────
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-LIB_DIR="${SCRIPT_DIR}/../scripts"
+# Dev: scripts/ sibling of bin/ | Install: ~/.local/share/hyprcaffeine/scripts/
+if [[ -d "${SCRIPT_DIR}/../scripts" ]]; then
+    LIB_DIR="${SCRIPT_DIR}/../scripts"
+elif [[ -d "${SCRIPT_DIR}/../share/hyprcaffeine/scripts" ]]; then
+    LIB_DIR="${SCRIPT_DIR}/../share/hyprcaffeine/scripts"
+else
+    echo "Error: scripts/ not found" >&2; exit 1
+fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
 readonly VERSION="3.0.0"
@@ -26,19 +33,21 @@ readonly CLR_GREEN="#a6e3a1"
 readonly CLR_RED="#f38ba8"
 readonly CLR_YELLOW="#f9e2af"
 
-# ── Nerd Font Icons (Material Design) ────────────────────────────────────────
+# ── Nerd Font Icons (from icons.sh — verified via nerdfonts.com cheat-sheet) ──
 source "${LIB_DIR}/icons.sh"
 readonly ICON_ACTIVE="${NF_COFFEE}"
 readonly ICON_INACTIVE="${NF_COFFEE_OUTLINE}"
-readonly ICON_TIMER="󱎫"
+readonly ICON_TIMER="${NF_TIMER}"
 readonly ICON_INFINITE="${NF_INFINITE}"
-readonly ICON_MONITOR="󰍹"
-readonly ICON_LID="󰍺"
-readonly WB_COFFEE="☕"
-readonly WB_LOOP="∞"
-readonly WB_TIMER="⏱"
-readonly WB_MONITOR="🖥"
-readonly WB_LID="💻"
+readonly ICON_MONITOR="${NF_MONITOR}"
+readonly ICON_LID="${NF_LAPTOP}"
+# Waybar uses same NF icons as menu — consistent UI
+readonly WB_COFFEE="${NF_COFFEE}"
+readonly WB_COFFEE_OFF="${NF_COFFEE_OUTLINE}"
+readonly WB_LOOP="${NF_INFINITE}"
+readonly WB_TIMER="${NF_TIMER}"
+readonly WB_MONITOR="${NF_MONITOR}"
+readonly WB_LID="${NF_LAPTOP}"
 # ── State Directory ──────────────────────────────────────────────────────────
 readonly STATE_DIR="${HOME}/.cache/hyprcaffeine"
 readonly STATE_FILE="${STATE_DIR}/state.json"
@@ -331,12 +340,13 @@ do_waybar() {
         fi
     fi
 
-    # ── Build text ── cup always first, then action icons
-    local any_active="false"
-    [[ "${timer_on}" == "true" || "${infinite_on}" == "true" || "${monitor}" == "true" || "${lid}" == "true" ]] && any_active="true"
+    # ── Build text ── cup first, then active toggle icons
+    # Cup: filled when idle active, outline when off
+    local idle_active="false"
+    [[ "${timer_on}" == "true" || "${infinite_on}" == "true" ]] && idle_active="true"
 
-    local cup="${WB_COFFEE}"
-    [[ "${any_active}" == "true" ]] && cup="${WB_COFFEE}"
+    local cup="${WB_COFFEE_OFF}"
+    [[ "${idle_active}" == "true" ]] && cup="${WB_COFFEE}"
 
     local action_parts=()
     if [[ "${infinite_on}" == "true" ]]; then
@@ -354,22 +364,22 @@ do_waybar() {
 
     local text="${cup}"
     if [[ ${#action_parts[@]} -gt 0 ]]; then
-        text="${cup}  $(IFS=' '; echo "${action_parts[*]}")"
+        text="${cup}$(IFS=' '; echo "${action_parts[*]}")"
     fi
 
     # ── Build tooltip ──
     local tooltip_parts=()
     if [[ "${timer_on}" == "true" ]]; then
-        tooltip_parts+=("󱎫 Timer: $(state_get_remaining)")
+        tooltip_parts+=("${NF_TIMER} Timer: $(state_get_remaining)")
     fi
     if [[ "${infinite_on}" == "true" ]]; then
-        tooltip_parts+=("󰋢 Infinite mode")
+        tooltip_parts+=("${NF_INFINITE} Infinite mode")
     fi
     if [[ "${monitor}" == "true" ]]; then
-        tooltip_parts+=("󰍹 Display: ON")
+        tooltip_parts+=("${NF_MONITOR} Display: ON")
     fi
     if [[ "${lid}" == "true" ]]; then
-        tooltip_parts+=("󰍺 Lid: Blocked")
+        tooltip_parts+=("${NF_LAPTOP} Lid: Blocked")
     fi
 
     local tooltip
@@ -379,37 +389,44 @@ do_waybar() {
         tooltip="$(IFS=' | '; echo "${tooltip_parts[*]}")"
     fi
 
-    # ── CSS class based on toggle combination ──
+    # ── CSS class + color based on toggle combination ──
     local class="hc-off"
+    local color="#6c7086"
 
     if [[ "${infinite_on}" == "true" && "${monitor}" == "true" && "${lid}" == "true" ]]; then
-        class="hc-all"
+        class="hc-all"; color="#f38ba8"
     elif [[ "${timer_on}" == "true" && "${monitor}" == "true" && "${lid}" == "true" ]]; then
-        class="hc-all"
+        class="hc-all"; color="#f38ba8"
     elif [[ "${infinite_on}" == "true" && "${monitor}" == "true" ]]; then
-        class="hc-infinite-monitor"
+        class="hc-infinite-monitor"; color="#a6e3a1"
     elif [[ "${infinite_on}" == "true" && "${lid}" == "true" ]]; then
-        class="hc-infinite-lid"
+        class="hc-infinite-lid"; color="#f5c2e7"
     elif [[ "${timer_on}" == "true" && "${monitor}" == "true" ]]; then
-        class="hc-timer-monitor"
+        class="hc-timer-monitor"; color="#a6e3a1"
     elif [[ "${timer_on}" == "true" && "${lid}" == "true" ]]; then
-        class="hc-timer-lid"
+        class="hc-timer-lid"; color="#f5c2e7"
     elif [[ "${monitor}" == "true" && "${lid}" == "true" ]]; then
-        class="hc-monitor-lid"
+        class="hc-monitor-lid"; color="#89b4fa"
     elif [[ "${infinite_on}" == "true" ]]; then
-        class="hc-infinite"
+        class="hc-infinite"; color="#fab387"
     elif [[ "${timer_on}" == "true" ]]; then
-        class="hc-timer"
+        class="hc-timer"; color="#fab387"
     elif [[ "${monitor}" == "true" ]]; then
-        class="hc-monitor"
+        class="hc-monitor"; color="#94e2d5"
     elif [[ "${lid}" == "true" ]]; then
-        class="hc-lid"
+        class="hc-lid"; color="#cba6f7"
     fi
 
     tooltip="$(echo "${tooltip}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
 
-    printf '{"text":"%s","tooltip":"%s","class":"%s"}\n' \
-        "${text}" "${tooltip}" "${class}"
+    printf '{"text":"%s","tooltip":"%s","class":"%s","color":"%s"}\n' \
+        "${text}" "${tooltip}" "${class}" "${color}"
+}
+
+# ── Waybar (via ui-engine.sh) ──────────────────────────────────────────────
+
+do_waybar_engine() {
+    bash "${LIB_DIR}/ui-engine.sh" waybar
 }
 
 # ── Main Entry Point ─────────────────────────────────────────────────────────

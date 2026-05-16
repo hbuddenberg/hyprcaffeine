@@ -1,0 +1,129 @@
+{
+  "_meta": {
+    "description": "HyprCaffeine UI Dictionary — single source of truth for Walker menu + Waybar",
+    "version": "3.1.0",
+    "palette": "Catppuccin Mocha",
+    "icon_font": "JetBrainsMono Nerd Font (MDI + FA)",
+    "verified_source": "https://www.nerdfonts.com/cheat-sheet (glyphnames.json)"
+  },
+  "states": {
+    "off": {
+      "icon": "󰛊",
+      "icon_name": "nf-md-coffee_outline",
+      "icon_codepoint": "U+F06CA",
+      "label": "Inactive",
+      "description": "Caffeine: Inactive",
+      "color": "#6c7086",
+      "css_class": "hc-off"
+    },
+    "infinite": {
+      "icon": "",
+      "icon_name": "nf-fa-infinity",
+      "icon_codepoint": "U+EDFE",
+      "label": "Infinite",
+      "description": "Infinite idle inhibition",
+      "color": "#f9e2af",
+      "css_class": "hc-infinite",
+      "action": "on infinite"
+    },
+    "timer": {
+      "icon": "󰔛",
+      "icon_name": "nf-md-timer_outline",
+      "icon_codepoint": "U+F051B",
+      "label": "Timer",
+      "description": "Timed idle inhibition",
+      "color": "#fab387",
+      "css_class": "hc-timer",
+      "action": "on <duration>"
+    },
+    "monitor": {
+      "icon": "󰍹",
+      "icon_name": "nf-md-monitor",
+      "icon_codepoint": "U+F0379",
+      "label": "Keep Display On",
+      "description": "Prevent display from turning off",
+      "color": "#94e2d5",
+      "css_class": "hc-monitor",
+      "action": "monitor toggle"
+    },
+    "lid": {
+      "icon": "󰌢",
+      "icon_name": "nf-md-laptop",
+      "icon_codepoint": "U+F0322",
+      "label": "Block Lid",
+      "description": "Prevent suspend on lid close",
+      "color": "#cba6f7",
+      "css_class": "hc-lid",
+      "action": "lid toggle"
+    }
+  },
+  "coffee": {
+    "active": {
+      "icon": "󰅶",
+      "icon_name": "nf-md-coffee",
+      "icon_codepoint": "U+F0176"
+    },
+    "inactive": {
+      "icon": "󰛊",
+      "icon_name": "nf-md-coffee_outline",
+      "icon_codepoint": "U+F06CA"
+    }
+  },
+  "presets": {
+    "15m": {
+      "label": "15 min",
+      "icon": "󰔛",
+      "duration_seconds": 900
+    },
+    "30m": {
+      "label": "30 min",
+      "icon": "󰔛",
+      "duration_seconds": 1800
+    },
+    "1h": {
+      "label": "1 hour",
+      "icon": "󰔛",
+      "duration_seconds": 3600
+    },
+    "2h": {
+      "label": "2 hours",
+      "icon": "󰔛",
+      "duration_seconds": 7200
+    },
+    "inf": {
+      "label": "Infinite",
+      "icon": "",
+      "duration_seconds": 0
+    }
+  },
+  "combinations": {
+    "infinite+monitor": {
+      "color": "#a6e3a1",
+      "css_class": "hc-infinite-monitor"
+    },
+    "infinite+lid": {
+      "color": "#f5c2e7",
+      "css_class": "hc-infinite-lid"
+    },
+    "timer+monitor": {
+      "color": "#a6e3a1",
+      "css_class": "hc-timer-monitor"
+    },
+    "timer+lid": {
+      "color": "#f5c2e7",
+      "css_class": "hc-timer-lid"
+    },
+    "monitor+lid": {
+      "color": "#89b4fa",
+      "css_class": "hc-monitor-lid"
+    },
+    "infinite+monitor+lid": {
+      "color": "#f38ba8",
+      "css_class": "hc-all"
+    },
+    "timer+monitor+lid": {
+      "color": "#f38ba8",
+      "css_class": "hc-all"
+    }
+  }
+}

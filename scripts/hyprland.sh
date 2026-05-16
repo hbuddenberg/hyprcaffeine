@@ -28,12 +28,13 @@ hypr_idle_inhibit_on() {
     fi
 
     # Start sleep inhibitor in background — blocks suspend/hibernate only
+    # stderr suppressed: polkit may deny in non-interactive sessions
     systemd-inhibit \
         --what=sleep \
         --who=HyprCaffeine \
         --why="Caffeine mode active" \
         --mode=block \
-        sleep infinity &
+        sleep infinity 2>/dev/null &
 
     local pid=$!
     echo "${pid}" > "${_IDLE_PID_FILE}"
@@ -84,12 +85,13 @@ hypr_monitor_on() {
     fi
 
     # Start continuous idle inhibitor — blocks dim + DPMS + lock
+    # stderr suppressed: polkit may deny in non-interactive sessions
     systemd-inhibit \
         --what=idle \
         --who=HyprCaffeine \
         --why="Keep Display On" \
         --mode=block \
-        sleep infinity &
+        sleep infinity 2>/dev/null &
 
     local pid=$!
     echo "${pid}" > "${_MONITOR_PID_FILE}"
@@ -139,7 +141,7 @@ lid_inhibit_start() {
         --who=HyprCaffeine \
         --why="User requested" \
         --mode=block \
-        sleep infinity &
+        sleep infinity 2>/dev/null &
 
     local lid_pid=$!
     echo "${lid_pid}" > "${_LID_PID_FILE}"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# caffeine-menu.sh — Walker/Wofi menu for HyprCaffeine v3.0
-# Uses Nerd Font icons (monospace-width) for proper alignment
+# caffeine-menu.sh — Walker/Wofi menu for HyprCaffeine v3.1
+# Icons verified from https://www.nerdfonts.com/cheat-sheet (glyphnames.json)
 
 HYPRCAFFEINE="hyprcaffeine"
 STATE_FILE="${HOME}/.cache/hyprcaffeine/state.json"
@@ -17,24 +17,24 @@ _is_idle_active() { [[ "$(_get_field status)" == "active" ]]; }
 if [[ "$(_get_bool monitor)" == "true" ]]; then MON="●"; else MON="○"; fi
 if [[ "$(_get_bool lid)" == "true" ]];     then LID="●"; else LID="○"; fi
 
-# Build items — Nerd Font icons for monospace alignment
+# Build items — verified Nerd Font icons
 MENU_ITEMS=(
-    "󱎫 15 min"
-    "󱎫 30 min"
-    "󱎫 1 hour"
-    "󱎫 2 hours"
-    "󱎫 Custom..."
-    "󰋢 Infinite"
+    "󰔛 15 min"
+    "󰔛 30 min"
+    "󰔛 1 hour"
+    "󰔛 2 hours"
+    "󰔛 Custom..."
+    " Infinite"
     "────────────────────────"
     "󰍹 Keep Display On    ${MON}"
-    "󰍺 Block Lid          ${LID}"
+    "󰌢 Block Lid          ${LID}"
 )
 
 # If idle is active, add "Turn Off" at the bottom
 if _is_idle_active; then
     REMAINING="$(${HYPRCAFFEINE} status 2>/dev/null | grep -oP '\d+h? ?\d*m' | head -1)"
     MENU_ITEMS+=("────────────────────────")
-    MENU_ITEMS+=("󰾪 Turn Off (${REMAINING:-active})")
+    MENU_ITEMS+=("󰤆 Turn Off (${REMAINING:-active})")
 fi
 
 MENU_TEXT=""
