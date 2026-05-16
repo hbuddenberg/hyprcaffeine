@@ -359,7 +359,7 @@ do_waybar() {
         tooltip_parts+=("󱎫 Timer: $(state_get_remaining)")
     fi
     if [[ "${infinite_on}" == "true" ]]; then
-        tooltip_parts+=("󰷀 Infinite mode")
+        tooltip_parts+=("󰋢 Infinite mode")
     fi
     if [[ "${monitor}" == "true" ]]; then
         tooltip_parts+=("󰍹 Display: ON")
