@@ -31,7 +31,7 @@ source "${LIB_DIR}/icons.sh"
 readonly ICON_ACTIVE="${NF_COFFEE}"
 readonly ICON_INACTIVE="${NF_COFFEE_OUTLINE}"
 readonly ICON_TIMER="󱎫"
-readonly ICON_INFINITE=""
+readonly ICON_INFINITE="${NF_INFINITE}"
 readonly ICON_MONITOR="󰍹"
 readonly ICON_LID="󰍺"
 

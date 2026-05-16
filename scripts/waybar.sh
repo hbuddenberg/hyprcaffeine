@@ -21,7 +21,7 @@ fi
 
 # --- Icons (Nerd Font + Unicode) ---
 readonly _HC_ICON_TIMER="󱎫"           # Nerd Font: timer
-readonly _HC_ICON_INFINITE=""        # Nerd Font: nf-fa-infinity
+readonly _HC_ICON_INFINITE=""  # nf-fa-infinity
 readonly _HC_ICON_MONITOR="󰍹"         # Nerd Font: monitor
 readonly _HC_ICON_LID="󰍺"            # Nerd Font: lid
 readonly _HC_ICON_OFF="☕"            # Coffee cup (inactive)
