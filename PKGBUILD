@@ -1,15 +1,16 @@
 # Maintainer: Hans-Dieter Buddenberg <hbuddenberg@gmail.com>
 pkgname=hyprcaffeine
-pkgver=0.2.0
+pkgver=0.4.0
 pkgrel=1
 pkgdesc='☕ Idle inhibition utility for Hyprland — caffeine for your Wayland compositor'
 arch=(any)
 url='https://github.com/hbuddenberg/hyprcaffeine'
 license=(MIT)
-depends=(bash jq hyprland)
+depends=(bash jq hyprland socat)
 optdepends=(
     'gum: interactive menu and styled prompts'
     'libnotify: desktop notifications'
+    'walker: menu frontend'
 )
 install=hyprcaffeine.install
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
@@ -34,6 +35,9 @@ package() {
 
     # Default configuration
     install -Dm644 config/default.yaml "${pkgdir}/usr/share/hyprcaffeine/config/default.yaml"
+
+    # Polkit rule template
+    install -Dm644 config/polkit.rules "${pkgdir}/usr/share/hyprcaffeine/polkit.rules"
 
     # Waybar module template
     install -Dm644 waybar/module.json "${pkgdir}/usr/share/hyprcaffeine/waybar-module.json"

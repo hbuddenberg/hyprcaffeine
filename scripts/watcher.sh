@@ -10,6 +10,7 @@ WATCHER_STATE_DIR="${HOME}/.cache/hyprcaffeine"
 WATCHER_PID_FILE="${WATCHER_STATE_DIR}/watcher.pid"
 WATCHER_LOG_FILE="${WATCHER_STATE_DIR}/watcher.log"
 WATCHER_STATE_FILE="${WATCHER_STATE_DIR}/state.json"
+WATCHER_AUTO_FILE="${WATCHER_STATE_DIR}/watcher.auto"
 
 # ── Resolve the Hyprland event socket ────────────────────────────────────────
 _watcher_get_socket() {
@@ -98,9 +99,9 @@ _watcher_is_active() {
 
 # ── Check if current activation is auto (not manual) ─────────────────────────
 _watcher_is_auto() {
-    if [[ -f "${WATCHER_STATE_FILE}" ]]; then
+    if [[ -f "${WATCHER_AUTO_FILE}" ]]; then
         local auto_val
-        auto_val="$(grep -oP '"auto"\s*:\s*\K(true|false)' "${WATCHER_STATE_FILE}" 2>/dev/null || echo "false")"
+        auto_val="$(cat "${WATCHER_AUTO_FILE}" 2>/dev/null || echo "false")"
         [[ "${auto_val}" == "true" ]]
         return $?
     fi
@@ -112,18 +113,21 @@ _watcher_activate() {
     local reason="${1:-auto}"
     _watcher_log "Auto-activating caffeine (reason: ${reason})"
 
+    # Mark activation as auto (separate file to keep state.json clean)
+    mkdir -p "${WATCHER_STATE_DIR}"
+    echo "true" > "${WATCHER_AUTO_FILE}"
+
     # Use the CLI directly — simplest and most reliable
     if command -v hyprcaffeine &>/dev/null; then
-        hyprcaffeine on infinite --monitor --auto 2>/dev/null
+        hyprcaffeine on infinite 2>/dev/null
     else
         # Fallback: direct hyprctl calls
         hyprctl dispatch idleinhibit on 2>/dev/null || true
         hyprctl dispatch dpms on 2>/dev/null || true
-        # Write state with auto=true
-        mkdir -p "${WATCHER_STATE_DIR}"
+        # Write state in flat format (matching state.sh model)
         local ts
         ts="$(date +%s)"
-        echo "{\"status\":\"active\",\"duration\":0,\"activated_at\":\"${ts}\",\"pid\":\"\",\"features\":{\"idle\":true,\"monitor\":true,\"lid\":false,\"auto\":true}}" > "${WATCHER_STATE_FILE}"
+        echo "{\"status\":\"active\",\"duration\":0,\"activated_at\":\"${ts}\",\"pid\":\"\",\"monitor\":true,\"lid\":false}" > "${WATCHER_STATE_FILE}"
     fi
 }
 
@@ -139,12 +143,16 @@ _watcher_deactivate() {
 
     _watcher_log "Auto-deactivating caffeine (reason: ${reason})"
 
+    # Clear auto flag
+    mkdir -p "${WATCHER_STATE_DIR}"
+    echo "false" > "${WATCHER_AUTO_FILE}"
+
     if command -v hyprcaffeine &>/dev/null; then
         hyprcaffeine off 2>/dev/null
     else
         hyprctl dispatch idleinhibit off 2>/dev/null || true
         mkdir -p "${WATCHER_STATE_DIR}"
-        echo '{"status":"inactive","duration":0,"activated_at":"","pid":"","features":{"idle":false,"monitor":false,"lid":false,"auto":false}}' > "${WATCHER_STATE_FILE}"
+        echo '{"status":"inactive","duration":0,"activated_at":"","pid":"","monitor":false,"lid":false}' > "${WATCHER_STATE_FILE}"
     fi
 }
 

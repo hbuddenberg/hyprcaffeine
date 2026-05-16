@@ -1,0 +1,10 @@
+// HyprCaffeine polkit rule — allows inhibit without password prompt
+// Install to: /etc/polkit-1/rules.d/50-hyprcaffeine.rules
+// Replace USER_PLACEHOLDER with your actual username
+
+polkit.addRule(function(action, subject) {
+    if (action.id.indexOf("org.freedesktop.login1.inhibit") === 0 &&
+        subject.user == "USER_PLACEHOLDER") {
+        return polkit.Result.YES;
+    }
+});

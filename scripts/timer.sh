@@ -26,6 +26,12 @@ timer_start() {
     local his="${HYPRLAND_INSTANCE_SIGNATURE:-}"
     local xdg="${XDG_RUNTIME_DIR:-}"
 
+    # Calculate pre-warning sleep (60s before expiry)
+    local pre_warning_duration=0
+    if [[ "${duration_seconds}" -gt 60 ]]; then
+        pre_warning_duration=$(( duration_seconds - 60 ))
+    fi
+
     cat > "${timer_script}" <<'WORKER_EOF'
 #!/usr/bin/env bash
 # HyprCaffeine Timer Worker — auto-generated
@@ -33,7 +39,18 @@ export HYPRLAND_INSTANCE_SIGNATURE="__HIS__"
 export XDG_RUNTIME_DIR="__XDG__"
 export PATH="__PATH__"
 
-sleep __DURATION__
+PRE_WARNING="__PRE_WARNING__"
+FULL_DURATION="__DURATION__"
+
+if [[ "${PRE_WARNING}" -gt 0 ]]; then
+    # Duration > 60s: sleep (duration-60), warn, sleep 60, then deactivate
+    sleep "${PRE_WARNING}"
+    notify-send "HyprCaffeine" "Caffeine expiring in 60s" 2>/dev/null || true
+    sleep 60
+else
+    # Duration <= 60s: just sleep the full duration
+    sleep "${FULL_DURATION}"
+fi
 
 # Turn off idle only (preserve monitor/lid state)
 if command -v hyprcaffeine &>/dev/null; then
@@ -64,6 +81,7 @@ WORKER_EOF
         -e "s|__HIS__|${his}|g" \
         -e "s|__XDG__|${xdg}|g" \
         -e "s|__DURATION__|${duration_seconds}|g" \
+        -e "s|__PRE_WARNING__|${pre_warning_duration}|g" \
         -e "s|__STATE_DIR__|${state_dir}|g" \
         -e "s|__PATH__|${PATH}|g" \
         "${timer_script}"

@@ -278,41 +278,24 @@ readonly WB_CONFIG_DIR="${HOME}/.config/waybar"
 readonly WB_CONFIG="${WB_CONFIG_DIR}/config.jsonc"
 readonly WB_STYLE="${WB_CONFIG_DIR}/style.css"
 
-# CSS to inject — Catppuccin Mocha, text-color only (no bg/border/padding)
+# CSS to inject — Catppuccin Mocha, text-color only (consistent with Omarchy style)
 readonly WB_CSS_BLOCK='
 /* HyprCaffeine Waybar Module */
 #custom-hyprcaffeine {
-    font-size: 15px;
-    color: #6c7086;
-    transition: color 0.3s ease;
+    min-width: 12px;
+    margin: 0 7.5px;
 }
-#custom-hyprcaffeine.hc-off {
-    color: #6c7086;
-}
-#custom-hyprcaffeine.hc-timer,
-#custom-hyprcaffeine.hc-infinite {
-    color: #fab387;
-}
+#custom-hyprcaffeine.hc-off { color: #6c7086; }
+#custom-hyprcaffeine.hc-timer { color: #fab387; }
+#custom-hyprcaffeine.hc-infinite { color: #f9e2af; }
+#custom-hyprcaffeine.hc-monitor { color: #94e2d5; }
+#custom-hyprcaffeine.hc-lid { color: #cba6f7; }
 #custom-hyprcaffeine.hc-timer-monitor,
-#custom-hyprcaffeine.hc-infinite-monitor {
-    color: #a6e3a1;
-}
+#custom-hyprcaffeine.hc-infinite-monitor { color: #a6e3a1; }
 #custom-hyprcaffeine.hc-timer-lid,
-#custom-hyprcaffeine.hc-infinite-lid {
-    color: #f5c2e7;
-}
-#custom-hyprcaffeine.hc-monitor {
-    color: #94e2d5;
-}
-#custom-hyprcaffeine.hc-monitor-lid {
-    color: #89b4fa;
-}
-#custom-hyprcaffeine.hc-lid {
-    color: #cba6f7;
-}
-#custom-hyprcaffeine.hc-all {
-    color: #f38ba8;
-}
+#custom-hyprcaffeine.hc-infinite-lid { color: #f5c2e7; }
+#custom-hyprcaffeine.hc-monitor-lid { color: #89b4fa; }
+#custom-hyprcaffeine.hc-all { color: #f38ba8; }
 /* END HyprCaffeine */'
 
 integrate_waybar() {
@@ -432,6 +415,55 @@ integrate_waybar() {
     echo ""
 }
 
+# ── Polkit Rule Auto-Install ─────────────────────────────
+readonly POLKIT_RULE_TARGET="/etc/polkit-1/rules.d/50-hyprcaffeine.rules"
+readonly SRC_POLKIT_RULE="${SCRIPT_DIR}/config/polkit.rules"
+
+install_polkit_rule() {
+    header "Polkit Rule"
+
+    # Check if polkit rules directory exists
+    if [[ ! -d "/etc/polkit-1/rules.d" ]]; then
+        warn "Polkit rules directory not found (/etc/polkit-1/rules.d)"
+        note "Polkit rule installation skipped — systemd-inhibit may require manual auth"
+        return 0
+    fi
+
+    # Skip if the rule already exists (idempotent)
+    if [[ -f "${POLKIT_RULE_TARGET}" ]]; then
+        success "Polkit rule already installed at ${POLKIT_RULE_TARGET}"
+        return 0
+    fi
+
+    # Check if template exists
+    if [[ ! -f "${SRC_POLKIT_RULE}" ]]; then
+        warn "Polkit rule template not found at ${SRC_POLKIT_RULE}"
+        note "Skipping polkit rule installation"
+        return 0
+    fi
+
+    step "Installing polkit rule for idle inhibition..."
+
+    # Inject current username into the template
+    local current_user
+    current_user="$(whoami)"
+
+    local rule_content
+    rule_content="$(sed "s/USER_PLACEHOLDER/${current_user}/g" "${SRC_POLKIT_RULE}")"
+
+    # Write to system polkit rules directory (requires sudo)
+    echo "${rule_content}" | sudo tee "${POLKIT_RULE_TARGET}" > /dev/null 2>/dev/null
+    if [[ $? -eq 0 ]]; then
+        sudo chmod 644 "${POLKIT_RULE_TARGET}" 2>/dev/null || true
+        success "Polkit rule installed → ${POLKIT_RULE_TARGET}"
+        note "Rule allows user '${current_user}' to inhibit sleep without auth prompts"
+    else
+        warn "Could not write polkit rule (sudo may be required)"
+        note "Manual install: sudo cp ${SRC_POLKIT_RULE} ${POLKIT_RULE_TARGET}"
+        note "Then replace USER_PLACEHOLDER with your username"
+    fi
+}
+
 # ── Install ──────────────────────────────────────────────
 do_install() {
     header "Installing ${APP_NAME}"
@@ -504,7 +536,10 @@ do_install() {
     echo -e "  ${C_TEXT}Run:${C_RESET}  ${C_TEAL}hyprcaffeine --help${C_RESET}"
     echo -e "  ${C_TEXT}Quick:${C_RESET} ${C_TEAL}hyprcaffeine on 30m${C_RESET}"
 
-    # 7. Waybar auto-integration
+    # 7. Polkit rule
+    install_polkit_rule
+
+    # 8. Waybar auto-integration
     integrate_waybar
 }
 
