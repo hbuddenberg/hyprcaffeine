@@ -17,9 +17,9 @@
       "css_class": "hc-off"
     },
     "infinite": {
-      "icon": "",
-      "icon_name": "nf-fa-infinity",
-      "icon_codepoint": "U+EDFE",
+      "icon": "󰛤",
+      "icon_name": "nf-md-infinity",
+      "icon_codepoint": "U+F06E4",
       "label": "Infinite",
       "description": "Infinite idle inhibition",
       "color": "#f9e2af",
@@ -92,7 +92,7 @@
     },
     "inf": {
       "label": "Infinite",
-      "icon": "",
+      "icon": "󰛤",
       "duration_seconds": 0
     }
   },

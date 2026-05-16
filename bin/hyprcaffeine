@@ -364,7 +364,7 @@ do_waybar() {
 
     local text="${cup}"
     if [[ ${#action_parts[@]} -gt 0 ]]; then
-        text="${cup}$(IFS=' '; echo "${action_parts[*]}")"
+        text="${cup} $(IFS=' '; echo "${action_parts[*]}")"
     fi
 
     # ── Build tooltip ──

@@ -15,11 +15,8 @@ _LID_PID_FILE="${HOME}/.cache/hyprcaffeine/lid_inhibit.pid"
 
 # ── Sleep Inhibit (Timer/Infinite) ────────────────────────────────────────────
 # Blocks SUSPEND ONLY (--what=sleep). Does NOT block dim/dpms/lock.
-# This is the primary "caffeine" mode — keeps the system awake but allows
-# the display to dim/turn off normally.
 
 hypr_idle_inhibit_on() {
-    # Stop any existing inhibitor first
     hypr_idle_inhibit_off
 
     if ! command -v systemd-inhibit &>/dev/null; then
@@ -27,8 +24,6 @@ hypr_idle_inhibit_on() {
         return 1
     fi
 
-    # Start sleep inhibitor in background — blocks suspend/hibernate only
-    # stderr suppressed: polkit may deny in non-interactive sessions
     systemd-inhibit \
         --what=sleep \
         --who=HyprCaffeine \
@@ -37,14 +32,20 @@ hypr_idle_inhibit_on() {
         sleep infinity 2>/dev/null &
 
     local pid=$!
-    echo "${pid}" > "${_IDLE_PID_FILE}"
     disown "${pid}" 2>/dev/null || true
 
+    # Verify process survived (give it a moment to start)
+    sleep 0.3
+    if ! kill -0 "${pid}" 2>/dev/null; then
+        echo "Error: Sleep inhibitor process died immediately." >&2
+        rm -f "${_IDLE_PID_FILE}"
+        return 1
+    fi
+
+    echo "${pid}" > "${_IDLE_PID_FILE}"
     return 0
 }
 
-# Kill all HyprCaffeine sleep inhibitors (avoid zombie accumulation)
-# Uses ps+grep instead of pkill for broader compatibility
 _kill_all_idle_inhibitors() {
     local pids
     pids="$(ps -eo pid,args 2>/dev/null | grep "systemd-inhibit" | grep "HyprCaffeine" | grep "what=sleep" | grep -v grep | awk '{print $1}')"
@@ -58,7 +59,6 @@ hypr_idle_inhibit_off() {
     rm -f "${_IDLE_PID_FILE}"
 }
 
-# Check if sleep inhibitor is running
 hypr_idle_is_active() {
     if [[ -f "${_IDLE_PID_FILE}" ]]; then
         local pid
@@ -71,12 +71,8 @@ hypr_idle_is_active() {
 }
 
 # ── Keep Display On (Continuous idle inhibition) ──────────────────────────────
-# Uses systemd-inhibit --what=idle to continuously block dim + DPMS + lock.
-# Runs as a persistent background process (same pattern as sleep inhibit).
-# Persists across reboots via state file.
 
 hypr_monitor_on() {
-    # Stop any existing monitor inhibitor first
     hypr_monitor_off
 
     if ! command -v systemd-inhibit &>/dev/null; then
@@ -84,8 +80,6 @@ hypr_monitor_on() {
         return 1
     fi
 
-    # Start continuous idle inhibitor — blocks dim + DPMS + lock
-    # stderr suppressed: polkit may deny in non-interactive sessions
     systemd-inhibit \
         --what=idle \
         --who=HyprCaffeine \
@@ -94,13 +88,20 @@ hypr_monitor_on() {
         sleep infinity 2>/dev/null &
 
     local pid=$!
-    echo "${pid}" > "${_MONITOR_PID_FILE}"
     disown "${pid}" 2>/dev/null || true
 
+    # Verify process survived
+    sleep 0.3
+    if ! kill -0 "${pid}" 2>/dev/null; then
+        echo "Error: Monitor inhibitor process died immediately." >&2
+        rm -f "${_MONITOR_PID_FILE}"
+        return 1
+    fi
+
+    echo "${pid}" > "${_MONITOR_PID_FILE}"
     return 0
 }
 
-# Kill all HyprCaffeine monitor (idle) inhibitors
 _kill_all_monitor_inhibitors() {
     local pids
     pids="$(ps -eo pid,args 2>/dev/null | grep "systemd-inhibit" | grep "HyprCaffeine" | grep "Keep Display On" | grep -v grep | awk '{print $1}')"
@@ -114,7 +115,6 @@ hypr_monitor_off() {
     rm -f "${_MONITOR_PID_FILE}"
 }
 
-# Check if monitor inhibitor is running
 hypr_monitor_is_active() {
     if [[ -f "${_MONITOR_PID_FILE}" ]]; then
         local pid
@@ -139,18 +139,26 @@ lid_inhibit_start() {
     systemd-inhibit \
         --what=handle-lid-switch \
         --who=HyprCaffeine \
-        --why="User requested" \
+        --why="Block lid switch" \
         --mode=block \
         sleep infinity 2>/dev/null &
 
     local lid_pid=$!
-    echo "${lid_pid}" > "${_LID_PID_FILE}"
     disown "${lid_pid}" 2>/dev/null || true
 
+    # Verify process survived (lid needs polkit — may fail with Access denied)
+    sleep 0.3
+    if ! kill -0 "${lid_pid}" 2>/dev/null; then
+        echo "Error: Lid inhibitor process died — check polkit rules." >&2
+        echo "Hint: Create /etc/polkit-1/rules.d/50-hyprcaffeine-lid.rules" >&2
+        rm -f "${_LID_PID_FILE}"
+        return 1
+    fi
+
+    echo "${lid_pid}" > "${_LID_PID_FILE}"
     return 0
 }
 
-# Kill all HyprCaffeine lid inhibitors (avoid zombie accumulation)
 _kill_all_lid_inhibitors() {
     local pids
     pids="$(ps -eo pid,args 2>/dev/null | grep "systemd-inhibit" | grep "HyprCaffeine" | grep "handle-lid-switch" | grep -v grep | awk '{print $1}')"
