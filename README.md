@@ -8,11 +8,10 @@
 
 ### ☕ Keep your Hyprland awake — beautifully
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg?style=flat-square)](https://github.com/hbuddenberg/hyprcaffeine/releases)
+[![Version](https://img.shields.io/badge/version-0.4.2-blue.svg?style=flat-square)](https://github.com/hbuddenberg/hyprcaffeine/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 [![Shell: Bash](https://img.shields.io/badge/shell-bash-4EAA25.svg?style=flat-square&logo=gnubash&logoColor=white)](https://www.gnu.org/software/bash/)
 [![Hyprland](https://img.shields.io/badge/for-Hyprland-00e09e.svg?style=flat-square)](https://github.com/hyprwm/Hyprland)
-[![AUR](https://img.shields.io/badge/AUR-hyprcaffeine-1793D1.svg?style=flat-square&logo=archlinux&logoColor=white)](https://aur.archlinux.org/packages/hyprcaffeine)
 
 **HyprCaffeine** is a lightweight idle inhibition utility for [Hyprland](https://github.com/hyprwm/Hyprland).
 It prevents your screen from dimming, locking, or sleeping — on your terms.
@@ -27,16 +26,18 @@ It prevents your screen from dimming, locking, or sleeping — on your terms.
 
 ## ✨ Features
 
-- 🔄 **Toggle inhibition** with a single command or click
-- ⏱️ **Flexible durations** — `5m`, `2h`, `infinite`, or any format you need
-- 📊 **Waybar integration** — live status icon with countdown, tooltip, and CSS classes
-- 🖥️ **Fullscreen detection** — auto-inhibit during fullscreen apps and games
-- 🔊 **Audio detection** — stay awake while media is playing
-- 🎮 **Process-aware automation** — stay awake when Steam, Discord, or custom apps run
-- 🔔 **Desktop notifications** — get warned before your caffeine runs out
-- 🎨 **Catppuccin-themed** — because your tools should match your desktop
-- 🍬 **Gum-powered menus** — beautiful interactive terminal UI
-- 🪶 **Zero dependencies** — only `bash`, `jq`, `hyprctl`, and `notify-send`
+Each feature is **independent** — use them individually or combine them:
+
+- ⏱️ **Timer / Infinite** — blocks suspend for a set duration or indefinitely
+- 🖥️ **Keep Display On** — blocks dim, DPMS, and screen lock (persists across reboots)
+- 💻 **Block Lid** — prevents lid-close suspend (persists across reboots)
+- 📊 **Waybar integration** — live status with countdown, tooltip, and Catppuccin Mocha CSS classes
+- 🎮 **Walker menu** — interactive launcher menu via Walker (or wofi fallback)
+- ⏳ **Countdown timer** — live countdown with desktop notifications before expiry
+- 🔔 **Desktop notifications** — warned before caffeine runs out
+- 🔄 **systemd service** — auto-start with the watcher daemon
+- 🔐 **polkit auto-configure** — lid-blocking rules installed automatically
+- 🪶 **Minimal deps** — only `bash`, `jq`, `hyprctl`, and `notify-send`
 
 ---
 
@@ -44,19 +45,7 @@ It prevents your screen from dimming, locking, or sleeping — on your terms.
 
 ### AUR (Arch Linux)
 
-```bash
-paru -S hyprcaffeine
-# or
-yay -S hyprcaffeine
-```
-
-Build from AUR manually:
-
-```bash
-git clone https://aur.archlinux.org/hyprcaffeine.git
-cd hyprcaffeine
-makepkg -si
-```
+> **Coming soon** — the package is not yet published on the AUR.
 
 ### Manual Install
 
@@ -77,14 +66,8 @@ The installer checks dependencies, installs the binary to `~/.local/bin/`, scrip
 ### Uninstall
 
 ```bash
-# If installed via AUR
-paru -Rns hyprcaffeine
-
-# If installed manually
 ./install.sh --uninstall
 ```
-
-📖 See [docs/INSTALL.md](docs/INSTALL.md) for detailed instructions and troubleshooting.
 
 ---
 
@@ -92,13 +75,17 @@ paru -Rns hyprcaffeine
 
 | Command | Description |
 |:---|:---|
-| `hyprcaffeine` | Open interactive gum menu with duration presets |
-| `hyprcaffeine on [DURATION]` | Activate idle inhibition |
-| `hyprcaffeine off` | Deactivate idle inhibition |
-| `hyprcaffeine toggle` | Toggle inhibition on/off |
+| `hyprcaffeine` | Open interactive Walker/wofi menu |
+| `hyprcaffeine on [DURATION]` | Activate sleep inhibition (suspend blocker) |
+| `hyprcaffeine off` | Deactivate sleep inhibition |
+| `hyprcaffeine off --all` | Deactivate **all** features (sleep + monitor + lid) |
 | `hyprcaffeine status` | Show current inhibition state |
+| `hyprcaffeine toggle` | Toggle sleep inhibition on/off |
 | `hyprcaffeine waybar` | Output Waybar-compatible JSON status |
-| `hyprcaffeine menu` | Open launcher menu (walker/wofi) |
+| `hyprcaffeine menu` | Open Walker/wofi launcher menu |
+| `hyprcaffeine monitor on\|off\|toggle` | Keep Display On — blocks dim + DPMS + lock |
+| `hyprcaffeine lid on\|off\|toggle` | Block lid-close suspend |
+| `hyprcaffeine watcher start\|stop\|status` | Auto-activate daemon |
 | `hyprcaffeine --help` | Show help message |
 | `hyprcaffeine --version` | Show version |
 
@@ -111,6 +98,7 @@ The `on` subcommand accepts flexible duration strings:
 | `Ns` | `30s` | 30 seconds |
 | `Nm` | `15m` | 15 minutes |
 | `Nh` | `2h` | 2 hours |
+| `H:MM` | `1:30` | 1 hour 30 minutes |
 | `N` (bare number) | `30` | N minutes |
 | `infinite` / `inf` | `infinite` | No timeout — stays on until manually turned off |
 
@@ -119,24 +107,32 @@ The `on` subcommand accepts flexible duration strings:
 ## 📝 Examples
 
 ```bash
+# Block suspend for 30 minutes
+hyprcaffeine on 30m
+
+# Block suspend for 1h 30min
+hyprcaffeine on 1:30
+
+# Block suspend indefinitely
+hyprcaffeine on infinite
+
 # Quick toggle
 hyprcaffeine toggle
 
-# Activate for 5 minutes
-hyprcaffeine on 5m
-
-# Activate for 1 hour
-hyprcaffeine on 1h
-
-# Activate indefinitely
-hyprcaffeine on infinite
-
-# Turn off
+# Turn off sleep inhibition only
 hyprcaffeine off
+
+# Turn off everything
+hyprcaffeine off --all
 
 # Check status
 hyprcaffeine status
-# 󰒲 Active — remaining: 28m 45s
+
+# Toggle display keep-awake
+hyprcaffeine monitor toggle
+
+# Enable lid-close inhibit
+hyprcaffeine lid on
 
 # Waybar JSON output
 hyprcaffeine waybar
@@ -151,7 +147,7 @@ hyprcaffeine waybar
 
 Edit your Waybar config (`~/.config/waybar/config.jsonc`):
 
-```json
+```jsonc
 "custom/hyprcaffeine": {
     "exec": "hyprcaffeine waybar",
     "on-click": "hyprcaffeine toggle",
@@ -164,7 +160,7 @@ Edit your Waybar config (`~/.config/waybar/config.jsonc`):
 
 ### 2. Add to Modules List
 
-```json
+```jsonc
 "modules-right": [
     "custom/hyprcaffeine",
     "pulseaudio",
@@ -175,11 +171,13 @@ Edit your Waybar config (`~/.config/waybar/config.jsonc`):
 
 ### 3. Style with CSS
 
-The module outputs three CSS classes depending on state:
+The module outputs CSS classes depending on state:
 
-- **`hyprcaffeine-active`** — timer-based inhibition running
-- **`hyprcaffeine-infinite`** — infinite mode active
-- **`hyprcaffeine-inactive`** — caffeine is off
+| CSS Class | State |
+|:---|:---|
+| `hyprcaffeine-active` | Timer-based inhibition running |
+| `hyprcaffeine-infinite` | Infinite mode active |
+| `hyprcaffeine-inactive` | Caffeine is off |
 
 #### Catppuccin Mocha
 
@@ -294,8 +292,6 @@ The module outputs three CSS classes depending on state:
 - **Right click** → `hyprcaffeine off` — Turn off immediately
 - **Middle click** → `hyprcaffeine menu` — Open interactive menu
 
-> 📖 More styles and troubleshooting: [docs/WAYBAR.md](docs/WAYBAR.md)
-
 ---
 
 ## ⚙️ Configuration
@@ -306,35 +302,15 @@ Config file: `~/.config/hyprcaffeine/config.yaml`
 theme:
   accent: "#89b4fa"
   border: rounded
-  style: catppuccin
 
 timeouts:
-  default: 1800          # 30 minutes
-  presets:
-    - 900                # 15 min
-    - 1800               # 30 min
-    - 3600               # 1 hour
-    - 7200               # 2 hours
-
-automation:
-  fullscreen: false
-  audio: false
-  steam: false
-  discord: false
-  custom_processes: []
+  default: 1800          # 30 minutes (seconds)
 
 notifications:
   enabled: true
-  expire_warning: 60     # warn 60s before expiry
-
-waybar:
-  icon_active: "󰒲"
-  icon_inactive: "☕"
-  icon_infinite: "∞"
 ```
 
 > Config is re-read on each invocation — no daemon restart needed.
-> 📖 Full reference: [docs/CONFIG.md](docs/CONFIG.md)
 
 ---
 

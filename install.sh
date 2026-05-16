@@ -541,6 +541,34 @@ do_install() {
 
     # 8. Waybar auto-integration
     integrate_waybar
+
+    # 9. Systemd user service
+    install_systemd_service
+}
+
+# ── Systemd User Service ──────────────────────────────────
+
+install_systemd_service() {
+    local src_service="${SCRIPT_DIR}/systemd/hyprcaffeine.service"
+    local dst_dir="${HOME}/.config/systemd/user"
+    local dst_service="${dst_dir}/hyprcaffeine.service"
+
+    if [[ ! -f "${src_service}" ]]; then
+        warn "systemd service file not found in source — skipping"
+        return
+    fi
+
+    mkdir -p "${dst_dir}"
+    cp "${src_service}" "${dst_service}"
+
+    systemctl --user daemon-reload 2>/dev/null || true
+
+    # Enable but don't start — will activate on next login
+    if systemctl --user enable hyprcaffeine.service 2>/dev/null; then
+        success "systemd service enabled (auto-start on login)"
+    else
+        warn "Could not enable systemd service"
+    fi
 }
 
 # ── Uninstall ────────────────────────────────────────────

@@ -1,0 +1,13 @@
+[Unit]
+Description=HyprCaffeine — Restore previous state on login
+After=hyprland.service
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/hyprcaffeine watcher start
+ExecStop=%h/.local/bin/hyprcaffeine off --all
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical-session.target
