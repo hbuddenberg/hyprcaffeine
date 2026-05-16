@@ -270,6 +270,168 @@ patch_binary_lib_path() {
     fi
 }
 
+# ── Waybar Auto-Integration ──────────────────────────────
+# Detects waybar config and injects the hyprcaffeine module + CSS automatically.
+# Safe: skips if already integrated, backs up before modifying.
+
+readonly WB_CONFIG_DIR="${HOME}/.config/waybar"
+readonly WB_CONFIG="${WB_CONFIG_DIR}/config.jsonc"
+readonly WB_STYLE="${WB_CONFIG_DIR}/style.css"
+
+# CSS to inject — Catppuccin Mocha, text-color only (no bg/border/padding)
+readonly WB_CSS_BLOCK='
+/* HyprCaffeine Waybar Module */
+#custom-hyprcaffeine {
+    font-size: 15px;
+    color: #6c7086;
+    transition: color 0.3s ease;
+}
+#custom-hyprcaffeine.hc-off {
+    color: #6c7086;
+}
+#custom-hyprcaffeine.hc-timer,
+#custom-hyprcaffeine.hc-infinite {
+    color: #fab387;
+}
+#custom-hyprcaffeine.hc-timer-monitor,
+#custom-hyprcaffeine.hc-infinite-monitor {
+    color: #a6e3a1;
+}
+#custom-hyprcaffeine.hc-timer-lid,
+#custom-hyprcaffeine.hc-infinite-lid {
+    color: #f5c2e7;
+}
+#custom-hyprcaffeine.hc-monitor {
+    color: #94e2d5;
+}
+#custom-hyprcaffeine.hc-monitor-lid {
+    color: #89b4fa;
+}
+#custom-hyprcaffeine.hc-lid {
+    color: #cba6f7;
+}
+#custom-hyprcaffeine.hc-all {
+    color: #f38ba8;
+}
+/* END HyprCaffeine */'
+
+integrate_waybar() {
+    header "Waybar Integration"
+
+    # Check if waybar config exists
+    if [[ ! -f "${WB_CONFIG}" ]]; then
+        warn "Waybar config not found at ${WB_CONFIG}"
+        note "Run install again after configuring Waybar"
+        return 0
+    fi
+
+    local changed=false
+
+    # ── 1. Inject module definition into config.jsonc ──
+    if grep -q '"custom/hyprcaffeine"' "${WB_CONFIG}" 2>/dev/null; then
+        success "Module definition already in config.jsonc"
+    else
+        step "Adding module definition to config.jsonc..."
+        # Backup
+        cp "${WB_CONFIG}" "${WB_CONFIG}.bak.$(date +%s)"
+
+        # Find the last } in the file and insert before it
+        # The module block to insert
+        local module_block
+        module_block=$(
+            echo ''
+            echo '  "custom/hyprcaffeine": {'
+            echo '    "exec": "hyprcaffeine waybar",'
+            echo '    "on-click": "hyprcaffeine toggle",'
+            echo '    "on-click-right": "hyprcaffeine menu",'
+            echo '    "interval": 2,'
+            echo '    "return-type": "json"'
+            echo '  }'
+        )
+
+        # Insert before the final closing brace
+        # Use sed to find the last } and insert before it
+        if sed -i "$(
+            echo '/^}/{'
+            echo '    # If this is the last }, insert module block before it'
+            echo '    r /dev/stdin'
+            echo '    b'
+            echo '}'
+        )" "${WB_CONFIG}" <<< "${module_block}" 2>/dev/null; then
+            success "Module definition added"
+            changed=true
+        else
+            # Fallback: append to file
+            # Remove last closing brace, add module, re-add closing brace
+            local tmp_file
+            tmp_file=$(mktemp)
+            head -n -1 "${WB_CONFIG}" > "${tmp_file}"
+            echo "," >> "${tmp_file}"
+            echo "${module_block}" >> "${tmp_file}"
+            echo "}" >> "${tmp_file}"
+            mv "${tmp_file}" "${WB_CONFIG}"
+            success "Module definition added (fallback)"
+            changed=true
+        fi
+    fi
+
+    # ── 2. Add module to modules-left/center/right ──
+    if grep -q '"custom/hyprcaffeine"' "${WB_CONFIG}" | grep -q 'modules' 2>/dev/null; then
+        success "Module already in modules list"
+    else
+        # Try to add to modules-right (most common for system tray items)
+        if grep -q '"modules-right"' "${WB_CONFIG}" 2>/dev/null; then
+            step "Adding to modules-right..."
+            # Insert "custom/hyprcaffeine" as the first item in modules-right array
+            sed -i 's/"modules-right"\s*:\s*\[/"modules-right": [\n    "custom\/hyprcaffeine",/' "${WB_CONFIG}"
+            success "Added to modules-right"
+            changed=true
+        elif grep -q '"modules-center"' "${WB_CONFIG}" 2>/dev/null; then
+            step "Adding to modules-center..."
+            sed -i 's/"modules-center"\s*:\s*\[/"modules-center": [\n    "custom\/hyprcaffeine",/' "${WB_CONFIG}"
+            success "Added to modules-center"
+            changed=true
+        elif grep -q '"modules-left"' "${WB_CONFIG}" 2>/dev/null; then
+            step "Adding to modules-left..."
+            sed -i 's/"modules-left"\s*:\s*\[/"modules-left": [\n    "custom\/hyprcaffeine",/' "${WB_CONFIG}"
+            success "Added to modules-left"
+            changed=true
+        else
+            warn "Could not find modules list in config"
+            note "Add \"custom/hyprcaffeine\" to your modules list manually"
+        fi
+    fi
+
+    # ── 3. Inject CSS styles ──
+    if [[ -f "${WB_STYLE}" ]]; then
+        if grep -q 'HyprCaffeine Waybar Module' "${WB_STYLE}" 2>/dev/null; then
+            success "CSS styles already in style.css"
+        else
+            step "Adding CSS styles to style.css..."
+            cp "${WB_STYLE}" "${WB_STYLE}.bak.$(date +%s)"
+            echo "${WB_CSS_BLOCK}" >> "${WB_STYLE}"
+            success "CSS styles added"
+            changed=true
+        fi
+    else
+        warn "style.css not found at ${WB_STYLE}"
+        note "CSS styles will be added when you create a style.css"
+    fi
+
+    # ── 4. Restart waybar if changes were made ──
+    if [[ "${changed}" == true ]]; then
+        step "Restarting Waybar..."
+        if pgrep -x waybar &>/dev/null; then
+            (killall waybar 2>/dev/null && waybar &>/dev/null &) || true
+            success "Waybar restarted"
+        else
+            note "Waybar is not running — start it to see the module"
+        fi
+    fi
+
+    echo ""
+}
+
 # ── Install ──────────────────────────────────────────────
 do_install() {
     header "Installing ${APP_NAME}"
@@ -342,22 +504,8 @@ do_install() {
     echo -e "  ${C_TEXT}Run:${C_RESET}  ${C_TEAL}hyprcaffeine --help${C_RESET}"
     echo -e "  ${C_TEXT}Quick:${C_RESET} ${C_TEAL}hyprcaffeine on 30m${C_RESET}"
 
-    # 7. Waybar integration hint
-    header "Waybar Integration"
-    echo -e "  ${C_TEXT}Add to your Waybar config:${C_RESET}"
-    echo ""
-    echo -e "  ${C_TEAL}\"custom/hyprcaffeine\": {${C_RESET}"
-    echo -e "  ${C_TEAL}  \"exec\": \"hyprcaffeine waybar\",${C_RESET}"
-    echo -e "  ${C_TEAL}  \"on-click\": \"hyprcaffeine toggle\",${C_RESET}"
-    echo -e "  ${C_TEAL}  \"on-click-right\": \"hyprcaffeine off\",${C_RESET}"
-    echo -e "  ${C_TEAL}  \"on-click-middle\": \"hyprcaffeine menu\",${C_RESET}"
-    echo -e "  ${C_TEAL}  \"interval\": 1,${C_RESET}"
-    echo -e "  ${C_TEAL}  \"return-type\": \"json\"${C_RESET}"
-    echo -e "  ${C_TEAL}}${C_RESET}"
-    echo ""
-    note "Module JSON: waybar/module.json"
-    note "CSS examples: docs/WAYBAR.md"
-    echo ""
+    # 7. Waybar auto-integration
+    integrate_waybar
 }
 
 # ── Uninstall ────────────────────────────────────────────
