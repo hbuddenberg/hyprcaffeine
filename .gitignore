@@ -22,3 +22,7 @@ Thumbs.db
 # Rust build
 src-tui/target/
 
+src/
+*.tar.gz
+src/
+pkg/
