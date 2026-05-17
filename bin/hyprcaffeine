@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HyprCaffeine — Idle inhibition utility for Hyprland
-# Version: 0.6.5
+# Version: 0.7.0
 # Author: HyprCaffeine Contributors
 # License: MIT
 
@@ -18,7 +18,7 @@ else
 fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="0.6.2"
+readonly VERSION="0.7.0"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -85,6 +85,8 @@ SUBCOMMANDS:
     menu                Walker/wofi launcher menu
     monitor on|off|toggle  Keep Display On (blocks dim + DPMS)
     lid on|off|toggle      Block lid-close suspend
+    waybar-setup [--force]  Configure waybar integration (smart)
+    waybar-remove       Remove waybar integration
     watcher start|stop|status  Auto-activate daemon
 
 DURATION FORMATS:
@@ -484,6 +486,12 @@ main() {
             else
                 bash "${LIB_DIR}/caffeine-menu.sh"
             fi
+            ;;
+        waybar-setup)
+            bash "${LIB_DIR}/waybar-setup.sh" "${1:-}"
+            ;;
+        waybar-remove)
+            bash "${LIB_DIR}/waybar-remove.sh"
             ;;
         monitor)
             local action="${1:-toggle}"
