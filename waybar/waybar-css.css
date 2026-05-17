@@ -1,0 +1,18 @@
+
+/* HyprCaffeine Waybar Module */
+#custom-hyprcaffeine {
+    min-width: 12px;
+    margin: 0 7.5px;
+}
+#custom-hyprcaffeine.hc-off { color: #6c7086; }
+#custom-hyprcaffeine.hc-timer { color: #fab387; }
+#custom-hyprcaffeine.hc-infinite { color: #f9e2af; }
+#custom-hyprcaffeine.hc-monitor { color: #94e2d5; }
+#custom-hyprcaffeine.hc-lid { color: #cba6f7; }
+#custom-hyprcaffeine.hc-timer-monitor,
+#custom-hyprcaffeine.hc-infinite-monitor { color: #a6e3a1; }
+#custom-hyprcaffeine.hc-timer-lid,
+#custom-hyprcaffeine.hc-infinite-lid { color: #f5c2e7; }
+#custom-hyprcaffeine.hc-monitor-lid { color: #89b4fa; }
+#custom-hyprcaffeine.hc-all { color: #f38ba8; }
+/* END HyprCaffeine */
