@@ -283,7 +283,8 @@ readonly WB_CSS_BLOCK='
 /* HyprCaffeine Waybar Module */
 #custom-hyprcaffeine {
     min-width: 12px;
-    margin: 0 7.5px;
+    margin: 0 16px 0 7px;
+    padding: 0 2px;
 }
 #custom-hyprcaffeine.hc-off { color: #6c7086; }
 #custom-hyprcaffeine.hc-timer { color: #fab387; }
