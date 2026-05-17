@@ -12,6 +12,8 @@
 **HyprCaffeine** is a lightweight idle inhibition utility for [Hyprland](https://github.com/hyprwm/Hyprland).
 It prevents your screen from dimming, locking, or sleeping — on your terms.
 
+![HyprCaffeine — Waybar, Notification & Walker Menu](docs/images/screenshot.png)
+
 [Report a Bug](https://github.com/hbuddenberg/hyprcaffeine/issues) ·
 [Request a Feature](https://github.com/hbuddenberg/hyprcaffeine/issues) ·
 [Contribute](https://github.com/hbuddenberg/hyprcaffeine/pulls)
