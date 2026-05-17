@@ -10,13 +10,18 @@ if [ -f "$WB_CONFIG" ]; then
     # Migrate old hardcoded paths
     sed -i 's|bash [^"]*caffeine-menu\.sh|hyprcaffeine menu|g' "$WB_CONFIG" 2>/dev/null
 
-    # Check if definition exists
-    _has_def=$(grep -c '"custom/hyprcaffeine"' "$WB_CONFIG" 2>/dev/null || echo 0)
+    # Check if module definition exists
+    _has_def=false
+    grep -q '"custom/hyprcaffeine"' "$WB_CONFIG" 2>/dev/null && _has_def=true
+
     # Check if module is in modules-right array
-    _in_array=$(grep -c '"custom/hyprcaffeine"' <(grep -A20 '"modules-right"' "$WB_CONFIG" | head -20) 2>/dev/null || echo 0)
+    # Extract modules-right block (up to closing bracket) and search within
+    _in_array=false
+    _mr_block=$(sed -n '/"modules-right"/,/]/p' "$WB_CONFIG" 2>/dev/null)
+    echo "$_mr_block" | grep -q '"custom/hyprcaffeine"' 2>/dev/null && _in_array=true
 
     # Add module definition if not present
-    if [ "$_has_def" -eq 0 ]; then
+    if [ "$_has_def" = false ]; then
         # Backup
         cp "$WB_CONFIG" "${WB_CONFIG}.bak.$(date +%s)"
 
@@ -38,16 +43,15 @@ MODULE
     fi
 
     # Add to modules-right if not already there
-    if [ "$_in_array" -eq 0 ]; then
+    if [ "$_in_array" = false ]; then
         # Smart positioning: after tray-expander if it exists
         if grep -q '"group/tray-expander",' "$WB_CONFIG" 2>/dev/null; then
             sed -i '/"group\/tray-expander",/a\    "custom/hyprcaffeine",' "$WB_CONFIG"
         else
-            # Fallback: as first item in modules-right
-            sed -i 's/"modules-right": \[\n/"modules-right": [\n    "custom\/hyprcaffeine",/' "$WB_CONFIG" 2>/dev/null || \
-            sed -i '/"modules-right"/{n;s/\[/[\n    "custom\/hyprcaffeine",/}' "$WB_CONFIG" 2>/dev/null
+            # Fallback: as first item after opening bracket
+            sed -i '/"modules-right"/{/"/{s/\[/[\n    "custom\/hyprcaffeine",/}' "$WB_CONFIG" 2>/dev/null
         fi
-        echo "  ✅ Waybar module positioned"
+        echo "  ✅ Waybar module positioned in modules-right"
     else
         echo "  ✅ Waybar module already in modules-right"
     fi
