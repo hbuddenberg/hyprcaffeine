@@ -27,17 +27,17 @@ FORCE=false
 
 _log() { echo "  $1"; }
 
-# Extract modules-right block from config (line range)
+# Extract modules-right block from config
 _get_modules_right_block() {
     sed -n '/"modules-right"/,/]/p' "$WB_CONFIG" 2>/dev/null
 }
 
-# Check if module definition exists in config
+# Check if module definition exists anywhere in config
 _has_definition() {
-    grep -q '"custom/hyprcaffeine"' "$WB_CONFIG" 2>/dev/null
+    grep -c '"custom/hyprcaffeine"' "$WB_CONFIG" 2>/dev/null | grep -qv '^0$'
 }
 
-# Check if module is positioned in modules-right array
+# Check if module is positioned in modules-right array (not in definition)
 _in_modules_right() {
     _get_modules_right_block | grep -q '"custom/hyprcaffeine"' 2>/dev/null
 }
@@ -50,28 +50,34 @@ _has_css() {
 # ── Remove ───────────────────────────────────────────────────────────────────
 
 _remove_all() {
-    # Remove from modules-right array
+    # 1. Remove from modules-right array only (scoped to that block)
     if _in_modules_right; then
-        sed -i '/"custom\/hyprcaffeine",/d' "$WB_CONFIG" 2>/dev/null
+        sed -i '/"modules-right"/,/]/{/"custom\/hyprcaffeine",/d}' "$WB_CONFIG" 2>/dev/null
         _log "✅ Removed from modules-right"
     fi
 
-    # Remove module definition (multi-line block)
+    # 2. Remove module definition block — use python for reliable JSON-aware removal
     if _has_definition; then
-        # Use sed to remove the block: "custom/hyprcaffeine": { ... }
-        # Works with both comma-separated and standalone blocks
-        sed -i '/"custom\/hyprcaffeine"/,/}/d' "$WB_CONFIG" 2>/dev/null
-        # Clean trailing comma before closing brace if needed
-        sed -i 's/,\s*$//' "$WB_CONFIG" 2>/dev/null
+        python3 -c "
+import re, sys
+with open('$WB_CONFIG', 'r') as f:
+    content = f.read()
+# Remove the block: optional leading comma, whitespace, the key, and its { ... } value
+content = re.sub(r',?\s*\"custom/hyprcaffeine\"\s*:\s*\{[^}]*\}', '', content)
+# Clean up any double commas left behind
+content = content.replace(',,', ',')
+with open('$WB_CONFIG', 'w') as f:
+    f.write(content)
+" 2>/dev/null
         _log "✅ Removed module definition"
     fi
 
-    # Remove CSS block
+    # 3. Remove CSS — match from the HyprCaffeine marker to end of style block
     if _has_css; then
-        sed -i '/HyprCaffeine Waybar Module/,/STYLE/d' "$WB_STYLE" 2>/dev/null
-        sed -i '/HyprCaffeine Waybar — Catppuccin/d' "$WB_STYLE" 2>/dev/null
-        # Remove all hc-* class blocks
-        sed -i '/#custom-hyprcaffeine/,/}/d' "$WB_STYLE" 2>/dev/null
+        # Remove everything between our markers
+        sed -i '/\/\* HyprCaffeine Waybar Module/,/^STYLE$/d' "$WB_STYLE" 2>/dev/null
+        # Also clean any remaining hc-* class blocks
+        sed -i '/#custom-hyprcaffeine/,/^}/d' "$WB_STYLE" 2>/dev/null
         _log "✅ Removed CSS"
     fi
 }
@@ -103,14 +109,24 @@ MODULEDEF
 # ── Position in modules-right ────────────────────────────────────────────────
 
 _position_module() {
-    # Smart: after group/tray-expander if it exists
+    # Smart: after group/tray-expander if it exists in modules-right
     if grep -q '"group/tray-expander",' "$WB_CONFIG" 2>/dev/null; then
         sed -i '/"group\/tray-expander",/a\    "custom/hyprcaffeine",' "$WB_CONFIG"
         _log "✅ Positioned after tray-expander in modules-right"
     else
         # Fallback: as first item in modules-right array
-        # Find the opening bracket of modules-right and insert after it
-        sed -i '/"modules-right"/{n;s/\[/[\n    "custom\/hyprcaffeine",/}' "$WB_CONFIG" 2>/dev/null
+        # Use python for reliable insertion
+        python3 -c "
+with open('$WB_CONFIG', 'r') as f:
+    content = f.read()
+content = content.replace(
+    '\"modules-right\": [',
+    '\"modules-right\": [\\n    \"custom/hyprcaffeine\",',
+    1
+)
+with open('$WB_CONFIG', 'w') as f:
+    f.write(content)
+" 2>/dev/null
         _log "✅ Positioned as first item in modules-right"
     fi
 }
@@ -126,6 +142,23 @@ _add_css() {
         _log "✅ Waybar CSS injected"
     else
         _log "⚠️  CSS file not found at $CSS_FILE"
+    fi
+}
+
+# ── Restart waybar ───────────────────────────────────────────────────────────
+
+_restart_waybar() {
+    if pgrep -x waybar &>/dev/null; then
+        _log "🔄 Restarting waybar..."
+        # Get Hyprland instance signature dynamically
+        local SIG
+        SIG="$(ls /run/user/1000/hypr/ 2>/dev/null | head -1)"
+        pkill -x waybar 2>/dev/null || true
+        sleep 0.5
+        if [[ -n "$SIG" ]]; then
+            HYPRLAND_INSTANCE_SIGNATURE="$SIG" WAYLAND_DISPLAY=wayland-1 \
+                XDG_RUNTIME_DIR="/run/user/$(id -u)" hyprctl dispatch exec waybar 2>/dev/null || true
+        fi
     fi
 }
 
@@ -164,15 +197,8 @@ main() {
         _add_css
     fi
 
-    # ── Restart waybar if running ──
-    if pgrep -x waybar &>/dev/null; then
-        _log "🔄 Restarting waybar..."
-        pkill -x waybar 2>/dev/null || true
-        sleep 0.5
-        if command -v hyprctl &>/dev/null; then
-            hyprctl dispatch exec waybar 2>/dev/null || true
-        fi
-    fi
+    # ── Restart waybar ──
+    _restart_waybar
 }
 
 main
