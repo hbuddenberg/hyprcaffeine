@@ -18,7 +18,7 @@ else
 fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="0.5.0"
+readonly VERSION="0.5.1"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────

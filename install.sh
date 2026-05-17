@@ -310,7 +310,14 @@ integrate_waybar() {
 
     local changed=false
 
-    # ── 1. Inject module definition into config.jsonc ──
+    # ── 1. Migrate old hardcoded paths in existing module ──
+    if grep -q 'caffeine-menu.sh' "${WB_CONFIG}" 2>/dev/null; then
+        step "Migrating old menu path to 'hyprcaffeine menu'..."
+        sed -i 's|bash [^"]*caffeine-menu\.sh|hyprcaffeine menu|g' "${WB_CONFIG}"
+        changed=true
+    fi
+
+    # ── 2. Inject module definition into config.jsonc ──
     if grep -q '"custom/hyprcaffeine"' "${WB_CONFIG}" 2>/dev/null; then
         success "Module definition already in config.jsonc"
     else
