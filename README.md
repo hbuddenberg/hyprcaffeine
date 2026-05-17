@@ -1,8 +1,8 @@
 <div align="center">
 
-# HyprCaffeine
+# ☕️ HyprCaffeine
 
-### ☕ Keep your Hyprland awake — beautifully
+### Keep your Hyprland awake — beautifully
 
 [![Version](https://img.shields.io/badge/version-0.4.2-blue.svg?style=flat-square)](https://github.com/hbuddenberg/hyprcaffeine/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
