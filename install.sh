@@ -363,10 +363,10 @@ integrate_waybar() {
         # ── 2b. Smart positioning: after tray-expander, or first in modules-right ──
         step "Positioning module in waybar..."
 
-        if grep -q '"group/tray-expander"' "${WB_CONFIG}" 2>/dev/null; then
-            # Insert custom/hyprcaffeine AFTER the line containing group/tray-expander
-            # in any modules-* array
-            sed -i '/"group\/tray-expander"/a\    "custom/hyprcaffeine",' "${WB_CONFIG}"
+        if grep -q '"group/tray-expander",' "${WB_CONFIG}" 2>/dev/null; then
+            # Insert custom/hyprcaffeine AFTER the array item line (ending with comma)
+            # Match only the modules-* array entry, not the definition block (which has ": {")
+            sed -i '/"group\/tray-expander",/a\    "custom/hyprcaffeine",' "${WB_CONFIG}"
             success "Positioned after tray-expander"
             changed=true
         elif grep -q '"modules-right"' "${WB_CONFIG}" 2>/dev/null; then
