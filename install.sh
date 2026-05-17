@@ -310,6 +310,15 @@ integrate_waybar() {
     fi
 
     local changed=false
+    local is_update=false
+
+    # ── Detect: is this an update or fresh install? ──
+    # If the module already exists anywhere in config.jsonc, it's an update.
+    if grep -q '"custom/hyprcaffeine"' "${WB_CONFIG}" 2>/dev/null; then
+        is_update=true
+        success "Existing HyprCaffeine module detected — update mode"
+        note "Module position and config will NOT be modified"
+    fi
 
     # ── 1. Migrate old hardcoded paths in existing module ──
     if grep -q 'caffeine-menu.sh' "${WB_CONFIG}" 2>/dev/null; then
@@ -318,16 +327,16 @@ integrate_waybar() {
         changed=true
     fi
 
-    # ── 2. Inject module definition into config.jsonc ──
-    if grep -q '"custom/hyprcaffeine"' "${WB_CONFIG}" 2>/dev/null; then
-        success "Module definition already in config.jsonc"
+    # ── 2. Fresh install: inject module definition + smart positioning ──
+    if [[ "${is_update}" == true ]]; then
+        success "Module definition preserved"
+        success "Module position preserved"
     else
-        step "Adding module definition to config.jsonc..."
-        # Backup
+        # Backup before modifying
         cp "${WB_CONFIG}" "${WB_CONFIG}.bak.$(date +%s)"
 
-        # Find the last } in the file and insert before it
-        # The module block to insert
+        # ── 2a. Inject module definition into config.jsonc ──
+        step "Adding module definition to config.jsonc..."
         local module_block
         module_block=$(
             echo ''
@@ -340,52 +349,38 @@ integrate_waybar() {
             echo '  }'
         )
 
-        # Insert before the final closing brace
-        # Use sed to find the last } and insert before it
-        if sed -i "$(
-            echo '/^}/{'
-            echo '    # If this is the last }, insert module block before it'
-            echo '    r /dev/stdin'
-            echo '    b'
-            echo '}'
-        )" "${WB_CONFIG}" <<< "${module_block}" 2>/dev/null; then
-            success "Module definition added"
-            changed=true
-        else
-            # Fallback: append to file
-            # Remove last closing brace, add module, re-add closing brace
-            local tmp_file
-            tmp_file=$(mktemp)
-            head -n -1 "${WB_CONFIG}" > "${tmp_file}"
-            echo "," >> "${tmp_file}"
-            echo "${module_block}" >> "${tmp_file}"
-            echo "}" >> "${tmp_file}"
-            mv "${tmp_file}" "${WB_CONFIG}"
-            success "Module definition added (fallback)"
-            changed=true
-        fi
-    fi
+        # Fallback: append to file (reliable for JSONC with comments)
+        local tmp_file
+        tmp_file=$(mktemp)
+        head -n -1 "${WB_CONFIG}" > "${tmp_file}"
+        echo "," >> "${tmp_file}"
+        echo "${module_block}" >> "${tmp_file}"
+        echo "}" >> "${tmp_file}"
+        mv "${tmp_file}" "${WB_CONFIG}"
+        success "Module definition added"
+        changed=true
 
-    # ── 2. Add module to modules-left/center/right ──
-    if grep -q '"custom/hyprcaffeine"' "${WB_CONFIG}" | grep -q 'modules' 2>/dev/null; then
-        success "Module already in modules list"
-    else
-        # Try to add to modules-right (most common for system tray items)
-        if grep -q '"modules-right"' "${WB_CONFIG}" 2>/dev/null; then
-            step "Adding to modules-right..."
-            # Insert "custom/hyprcaffeine" as the first item in modules-right array
+        # ── 2b. Smart positioning: after tray-expander, or first in modules-right ──
+        step "Positioning module in waybar..."
+
+        if grep -q '"group/tray-expander"' "${WB_CONFIG}" 2>/dev/null; then
+            # Insert custom/hyprcaffeine AFTER the line containing group/tray-expander
+            # in any modules-* array
+            sed -i '/"group\/tray-expander"/a\    "custom/hyprcaffeine",' "${WB_CONFIG}"
+            success "Positioned after tray-expander"
+            changed=true
+        elif grep -q '"modules-right"' "${WB_CONFIG}" 2>/dev/null; then
+            # No tray-expander: insert as first item in modules-right
             sed -i 's/"modules-right"\s*:\s*\[/"modules-right": [\n    "custom\/hyprcaffeine",/' "${WB_CONFIG}"
-            success "Added to modules-right"
+            success "Added as first item in modules-right"
             changed=true
         elif grep -q '"modules-center"' "${WB_CONFIG}" 2>/dev/null; then
-            step "Adding to modules-center..."
             sed -i 's/"modules-center"\s*:\s*\[/"modules-center": [\n    "custom\/hyprcaffeine",/' "${WB_CONFIG}"
-            success "Added to modules-center"
+            success "Added as first item in modules-center"
             changed=true
         elif grep -q '"modules-left"' "${WB_CONFIG}" 2>/dev/null; then
-            step "Adding to modules-left..."
             sed -i 's/"modules-left"\s*:\s*\[/"modules-left": [\n    "custom\/hyprcaffeine",/' "${WB_CONFIG}"
-            success "Added to modules-left"
+            success "Added as first item in modules-left"
             changed=true
         else
             warn "Could not find modules list in config"
@@ -393,7 +388,7 @@ integrate_waybar() {
         fi
     fi
 
-    # ── 3. Inject CSS styles ──
+    # ── 3. Inject CSS styles (always safe to check) ──
     if [[ -f "${WB_STYLE}" ]]; then
         if grep -q 'HyprCaffeine Waybar Module' "${WB_STYLE}" 2>/dev/null; then
             success "CSS styles already in style.css"
