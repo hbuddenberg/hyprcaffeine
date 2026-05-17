@@ -35,6 +35,8 @@ Each feature is **independent** — use them individually or combine them:
 - 🔐 **polkit auto-configure** — lid-blocking rules installed automatically
 - 🪶 **Minimal deps** — only `bash`, `jq`, `hyprctl`, and `notify-send`
 
+![Walker Menu](docs/images/walker-menu.png)
+
 ---
 
 ## 📦 Installation
@@ -187,6 +189,8 @@ The module outputs CSS classes depending on state:
 - `hc-timer-lid` — Timer + Lid active
 - `hc-infinite-lid` — Infinite + Lid active
 - `hc-monitor-lid` — Monitor + Lid active
+
+![Waybar Color States](docs/images/color-states.png)
 
 #### Catppuccin Mocha
 
