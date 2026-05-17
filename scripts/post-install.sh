@@ -21,8 +21,8 @@ if [ -f "$WB_CONFIG" ]; then
 ,
   "custom/hyprcaffeine": {
     "exec": "hyprcaffeine waybar",
-    "on-click": "hyprcaffeine toggle",
-    "on-click-right": "hyprcaffeine menu",
+    "on-click": "hyprcaffeine menu",
+    "on-click-right": "hyprcaffeine toggle",
     "interval": 2,
     "return-type": "json"
   }

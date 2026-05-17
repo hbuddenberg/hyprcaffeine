@@ -478,8 +478,12 @@ main() {
             do_waybar
             ;;
         menu)
-            # Delegated to caffeine-menu.sh
-            bash "${LIB_DIR}/caffeine-menu.sh"
+            # Launch menu via hyprctl so it gets proper Wayland context
+            if command -v hyprctl &>/dev/null && [[ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]]; then
+                hyprctl dispatch exec "bash '${LIB_DIR}/caffeine-menu.sh'" 2>/dev/null
+            else
+                bash "${LIB_DIR}/caffeine-menu.sh"
+            fi
             ;;
         monitor)
             local action="${1:-toggle}"

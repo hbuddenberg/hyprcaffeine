@@ -14,9 +14,8 @@ Edit your Waybar config (usually `~/.config/waybar/config.jsonc`) and add:
 ```json
 "custom/hyprcaffeine": {
     "exec": "hyprcaffeine waybar",
-    "on-click": "hyprcaffeine toggle",
-    "on-click-right": "hyprcaffeine off",
-    "on-click-middle": "hyprcaffeine menu",
+    "on-click": "hyprcaffeine menu",
+    "on-click-right": "hyprcaffeine toggle",
     "interval": 1,
     "return-type": "json"
 }

@@ -26,3 +26,4 @@ src/
 *.tar.gz
 src/
 pkg/
+*.pkg.tar.zst
