@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HyprCaffeine — Idle inhibition utility for Hyprland
-# Version: 0.7.1
+# Version: 0.7.2
 # Author: HyprCaffeine Contributors
 # License: MIT
 
@@ -18,7 +18,7 @@ else
 fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="0.7.1"
+readonly VERSION="0.7.2"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
