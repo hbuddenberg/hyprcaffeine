@@ -44,7 +44,7 @@ _in_modules_right() {
 
 # Check if CSS is injected in style.css
 _has_css() {
-    grep -q 'HyprCaffeine Waybar Module' "$WB_STYLE" 2>/dev/null
+    grep -q '#custom-hyprcaffeine' "$WB_STYLE" 2>/dev/null
 }
 
 # ── Remove ───────────────────────────────────────────────────────────────────
@@ -72,12 +72,10 @@ with open('$WB_CONFIG', 'w') as f:
         _log "✅ Removed module definition"
     fi
 
-    # 3. Remove CSS — match from the HyprCaffeine marker to end of style block
+    # 3. Remove CSS — match from the HyprCaffeine marker to end comment
     if _has_css; then
-        # Remove everything between our markers
-        sed -i '/\/\* HyprCaffeine Waybar Module/,/^STYLE$/d' "$WB_STYLE" 2>/dev/null
-        # Also clean any remaining hc-* class blocks
-        sed -i '/#custom-hyprcaffeine/,/^}/d' "$WB_STYLE" 2>/dev/null
+        # Remove everything between our markers — match whole block
+        sed -i '/\/\* HyprCaffeine Waybar Module/,/\* END HyprCaffeine \*\//d' "$WB_STYLE" 2>/dev/null
         _log "✅ Removed CSS"
     fi
 }
