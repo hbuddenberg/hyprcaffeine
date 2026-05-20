@@ -12,16 +12,16 @@ All notable changes to HyprCaffeine are documented here.
 
 ### 🔧 Changed
 - **Path resolution** — Keybinds use absolute binary path (`/home/*/.local/bin/hyprcaffeine`) to avoid Hyprland PATH issues.
-- **Omarchy conflict resolution** — Installer detects and comments conflicting keybinds in Omarchy's `bindings/utilities.conf`.
 - **Monitor/Lid** — Now send `notify-send` on every toggle (enabled/disabled).
 - **Post-install** — Delegates waybar setup and keybinds to CLI subcommands.
 
 ### 🐛 Fixed
 - Keybinds not working on systems without `$mainMod` defined (now uses `SUPER` directly).
-- Dead keybind (SUPER+CTRL+I) conflict with Omarchy's `bindd` pre-binding.
+- Dead keybind (SUPER+CTRL+I) conflict with Omarchy's `bindd` — **auto-commented on install** (v0.7.4-2).
+- Omarchy binds auto-restored on `hyprcaffeine keybinds remove` (v0.7.4-2).
 
 ### 📦 Packaging
-- PKGBUILD updated to v0.7.4-1.
+- PKGBUILD v0.7.4-1 → v0.7.4-2 (Omarchy conflict fix, commit-based source archive).
 
 ---
 
