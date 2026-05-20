@@ -189,6 +189,8 @@ do_on() {
     local human_duration
     if [[ "${duration_seconds}" -eq 0 ]]; then
         human_duration=" infinite"
+        # Infinite mode siempre persistente — no necesita flag persist separado
+        state_set_persist "true"
     else
         human_duration="$(timer_human "${duration_seconds}")"
     fi
@@ -338,19 +340,17 @@ do_persist_toggle() {
 # ── Restore (re-apply saved state on boot) ─────────────────────────────────
 
 do_restore() {
-    # Only restore if persist is enabled
-    local persist
-    persist="$(state_get_persist)"
-    if [[ "${persist}" != "true" ]]; then
-        return 0
-    fi
-
     local state monitor lid duration restored=()
 
     state="$(state_get_status)"
     monitor="$(state_get_monitor)"
     lid="$(state_get_lid)"
     duration="$(state_get_duration)"
+
+    # Solo skip si está todo inactivo
+    if [[ "${state}" != "active" && "${monitor}" != "true" && "${lid}" != "true" ]]; then
+        return 0
+    fi
 
     # Restore monitor keep-awake
     if [[ "${monitor}" == "true" ]]; then
