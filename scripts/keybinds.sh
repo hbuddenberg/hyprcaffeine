@@ -195,6 +195,9 @@ _kb_install() {
 
     mkdir -p "$(dirname "${KEYBINDS_FILE}")"
 
+    # ALWAYS resolve Omarchy conflicts, regardless of whether keybinds are up-to-date
+    _kb_resolve_omarchy_conflicts
+
     # Check if already installed and up-to-date
     if [[ -f "${KEYBINDS_FILE}" ]]; then
         local current
@@ -207,9 +210,6 @@ _kb_install() {
 
     _kb_generate > "${KEYBINDS_FILE}"
     echo "  ✓ Created ${KEYBINDS_FILE}"
-
-    # Resolve Omarchy conflicts BEFORE adding source line
-    _kb_resolve_omarchy_conflicts
 
     # Source/require from hyprland config
     if [[ -f "${HYPRLAND_CONF}" ]]; then
