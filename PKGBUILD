@@ -1,6 +1,6 @@
 # Maintainer: Hans-Dieter Buddenberg <hbuddenberg@gmail.com>
 pkgname=hyprcaffeine
-pkgver=0.7.5
+pkgver=0.7.4
 pkgrel=1
 pkgdesc='☕ Idle inhibition utility for Hyprland — caffeine for your Wayland compositor'
 arch=(any)
@@ -13,18 +13,18 @@ optdepends=(
     'walker: menu frontend'
 )
 install=hyprcaffeine.install
-source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v$pkgver/hyprcaffeine-0.7.5.tar.gz")
-sha256sums=('c4ea12f7f3ca2a7a40057494296a827ae111e0f4b6a00be1efc89bf8f1d18486')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=("SKIP")
 
 prepare() {
-    cd "$(find "$srcdir" -maxdepth 1 -type d -name 'hyprcaffeine*' | head -1)" || return
+    cd "$srcdir/$pkgname-$pkgver" || return
 
     # Patch LIB_DIR in the binary to use the installed data path
     sed -i "s|LIB_DIR=\"\${SCRIPT_DIR}/../scripts\"|LIB_DIR=\"/usr/share/hyprcaffeine/scripts\"|" bin/hyprcaffeine
 }
 
 package() {
-    cd "$(find "$srcdir" -maxdepth 1 -type d -name 'hyprcaffeine*' | head -1)" || return
+    cd "$srcdir/$pkgname-$pkgver" || return
 
     # CLI binary
     install -Dm755 bin/hyprcaffeine "${pkgdir}/usr/bin/hyprcaffeine"

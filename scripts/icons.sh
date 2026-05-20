@@ -9,4 +9,3 @@ readonly NF_MONITOR="󰍹"          # U+F0379 nf-md-monitor
 readonly NF_LAPTOP="󰌢"          # U+F0322 nf-md-laptop
 readonly NF_TIMER="󰔛"           # U+F051B nf-md-timer_outline
 readonly NF_POWER="󰤆"            # U+F0906 nf-md-power_standby
-readonly NF_PERSIST="󰌁"          # U+F0301 nf-md-content_save (save/persist icon)
