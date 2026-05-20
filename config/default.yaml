@@ -33,3 +33,10 @@ waybar:
   icon_infinite: "∞"
   icon_monitor: "🖥"
   icon_lid: "🕮"
+
+keybinds:
+  enabled: true  # Auto-install on post-install
+  toggle_infinite: "$mainMod CTRL, I"
+  menu: "$mainMod CTRL SHIFT, I"
+  toggle_lid: "$mainMod CTRL SHIFT, D"
+  toggle_monitor: "$mainMod CTRL, D"

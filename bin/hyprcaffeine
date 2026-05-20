@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HyprCaffeine — Idle inhibition utility for Hyprland
-# Version: 0.7.2
+# Version: 0.7.4
 # Author: HyprCaffeine Contributors
 # License: MIT
 
@@ -18,7 +18,7 @@ else
 fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="0.7.2"
+readonly VERSION="0.7.4"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -59,6 +59,7 @@ source "${LIB_DIR}/timer.sh"
 source "${LIB_DIR}/notify.sh"
 source "${LIB_DIR}/hyprland.sh"
 source "${LIB_DIR}/watcher.sh"
+source "${LIB_DIR}/keybinds.sh"
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ SUBCOMMANDS:
     lid on|off|toggle      Block lid-close suspend
     waybar-setup [--force]  Configure waybar integration (smart)
     waybar-remove       Remove waybar integration
+    keybinds install|remove|status  Manage Hyprland keybindings
     watcher start|stop|status  Auto-activate daemon
 
 DURATION FORMATS:
@@ -243,6 +245,7 @@ do_monitor_on() {
     }
     state_set_monitor "true"
     echo "${ICON_MONITOR} Monitor keep-awake: ON"
+    notify_send "${ICON_MONITOR} Monitor" "Keep display on: enabled"
 }
 
 do_monitor_off() {
@@ -253,6 +256,7 @@ do_monitor_off() {
     hypr_monitor_off
     state_set_monitor "false"
     echo "${ICON_MONITOR} Monitor keep-awake: OFF"
+    notify_send "${ICON_MONITOR} Monitor" "Keep display on: disabled"
 }
 
 do_monitor_toggle() {
@@ -278,6 +282,7 @@ do_lid_on() {
     }
     state_set_lid "true"
     echo "${ICON_LID} Lid-close inhibit: ON"
+    notify_send "${ICON_LID} Lid" "Lid-close inhibit: enabled"
 }
 
 do_lid_off() {
@@ -288,6 +293,7 @@ do_lid_off() {
     lid_inhibit_stop
     state_set_lid "false"
     echo "${ICON_LID} Lid-close inhibit: OFF"
+    notify_send "${ICON_LID} Lid" "Lid-close inhibit: disabled"
 }
 
 do_lid_toggle() {
@@ -509,6 +515,15 @@ main() {
                 off)    do_lid_off ;;
                 toggle) do_lid_toggle ;;
                 *)      echo "Usage: hyprcaffeine lid <on|off|toggle>" >&2; exit 1 ;;
+            esac
+            ;;
+        keybinds)
+            local kb_action="${1:-status}"
+            case "${kb_action}" in
+                install) _kb_install ;;
+                remove)  _kb_remove ;;
+                status)  _kb_status ;;
+                *)       echo "Usage: hyprcaffeine keybinds <install|remove|status>" >&2; exit 1 ;;
             esac
             ;;
         watcher)

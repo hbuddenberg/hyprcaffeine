@@ -42,3 +42,9 @@ for dep in gum libnotify walker; do
         echo "  optdeps: $dep ✓"
     fi
 done
+
+# ── Keybinds (opt-in) ──
+if command -v hyprcaffeine &>/dev/null; then
+    hyprcaffeine keybinds install 2>/dev/null && \
+        echo "  ✅ Hyprland keybinds installed" || true
+fi
