@@ -173,7 +173,7 @@ _kb_resolve_omarchy_conflicts() {
                 echo "  🔧 Commented Omarchy conflict at ${conf##*/}:${lineno} — ${content%%exec,*}"
                 modified=true
                 resolved=$((resolved + 1))
-            done < <(grep -n "bind.*${combo}" "${conf}" 2>/dev/null || true)
+            done < <(grep -n "bind.*${combo}," "${conf}" 2>/dev/null || true)
         done
 
         if [[ "${modified}" == true ]]; then
@@ -270,7 +270,7 @@ _kb_restore_omarchy() {
                     modified=true
                     restored=$((restored + 1))
                 fi
-            done < <(grep -n "#.*bind.*${combo}" "${conf}" 2>/dev/null || true)
+            done < <(grep -n "#.*bind.*${combo}," "${conf}" 2>/dev/null || true)
         done
 
         if [[ "${modified}" == true ]]; then
