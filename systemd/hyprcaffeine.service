@@ -5,6 +5,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=oneshot
+ExecStart=%h/.local/bin/hyprcaffeine restore
 ExecStart=%h/.local/bin/hyprcaffeine watcher start
 ExecStop=%h/.local/bin/hyprcaffeine off --all
 RemainAfterExit=yes

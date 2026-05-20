@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HyprCaffeine — Idle inhibition utility for Hyprland
-# Version: 0.7.4
+# Version: 0.7.5
 # Author: HyprCaffeine Contributors
 # License: MIT
 
@@ -18,7 +18,7 @@ else
 fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="0.7.4"
+readonly VERSION="0.7.5"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -48,6 +48,7 @@ readonly WB_LOOP="${NF_INFINITE}"
 readonly WB_TIMER="${NF_TIMER}"
 readonly WB_MONITOR="${NF_MONITOR}"
 readonly WB_LID="${NF_LAPTOP}"
+readonly WB_PERSIST="${NF_PERSIST}"
 # ── State Directory ──────────────────────────────────────────────────────────
 readonly STATE_DIR="${HOME}/.cache/hyprcaffeine"
 readonly STATE_FILE="${STATE_DIR}/state.json"
@@ -74,6 +75,7 @@ FEATURES (each independent):
     Timer/Infinite      Blocks SUSPEND only (not dim/dpms/lock)
     Keep Display On     Blocks dim + DPMS + lock (persistent across reboots)
     Block Lid           Blocks lid-close suspend (persistent across reboots)
+    Persist             Toggle: save state across reboots (default: off)
 
 SUBCOMMANDS:
     (none)              Show interactive menu
@@ -86,6 +88,8 @@ SUBCOMMANDS:
     menu                Walker/wofi launcher menu
     monitor on|off|toggle  Keep Display On (blocks dim + DPMS)
     lid on|off|toggle      Block lid-close suspend
+    persist on|off|toggle  Toggle state persistence across reboots
+    restore             Restore saved state (called by systemd service)
     waybar-setup [--force]  Configure waybar integration (smart)
     waybar-remove       Remove waybar integration
     keybinds install|remove|status  Manage Hyprland keybindings
@@ -101,6 +105,7 @@ EXAMPLES:
     hyprcaffeine off               # Stop sleep inhibition
     hyprcaffeine monitor toggle    # Toggle display keep-awake
     hyprcaffeine lid on            # Enable lid-close inhibit
+    hyprcaffeine persist on        # Enable state persistence across reboots
     hyprcaffeine status            # Show all states
 EOF
 }
@@ -306,14 +311,97 @@ do_lid_toggle() {
     fi
 }
 
-# ── Status ───────────────────────────────────────────────────────────────────
+# ── Persist (survive reboots) ──────────────────────────────────────────────
 
-do_status() {
-    local state monitor lid parts=()
+do_persist_on() {
+    state_set_persist "true"
+    echo "${WB_PERSIST} Persist: ON — state will survive reboots"
+    notify_send "${WB_PERSIST} Persist" "Survive reboots: enabled"
+}
+
+do_persist_off() {
+    state_set_persist "false"
+    echo "${WB_PERSIST} Persist: OFF — state lost on reboot"
+    notify_send "${WB_PERSIST} Persist" "Survive reboots: disabled"
+}
+
+do_persist_toggle() {
+    local current
+    current="$(state_get_persist)"
+    if [[ "${current}" == "true" ]]; then
+        do_persist_off
+    else
+        do_persist_on
+    fi
+}
+
+# ── Restore (re-apply saved state on boot) ─────────────────────────────────
+
+do_restore() {
+    # Only restore if persist is enabled
+    local persist
+    persist="$(state_get_persist)"
+    if [[ "${persist}" != "true" ]]; then
+        return 0
+    fi
+
+    local state monitor lid duration restored=()
 
     state="$(state_get_status)"
     monitor="$(state_get_monitor)"
     lid="$(state_get_lid)"
+    duration="$(state_get_duration)"
+
+    # Restore monitor keep-awake
+    if [[ "${monitor}" == "true" ]]; then
+        hypr_monitor_on 2>/dev/null && restored+=("monitor")
+    fi
+
+    # Restore lid inhibit
+    if [[ "${lid}" == "true" ]]; then
+        lid_inhibit_start 2>/dev/null && restored+=("lid")
+    fi
+
+    # Restore idle inhibition (infinite only; finite timers check remaining)
+    if [[ "${state}" == "active" ]]; then
+        if [[ "${duration}" -eq 0 ]]; then
+            # Infinite mode — always restore
+            hypr_idle_inhibit_on 2>/dev/null && restored+=("infinite")
+        else
+            # Finite timer — restore only if time remaining
+            local remaining
+            remaining="$(state_get_remaining)"
+            if [[ "${remaining}" != "expired" && "${remaining}" != "unknown" ]]; then
+                # Parse remaining back to seconds
+                local remain_seconds
+                remain_seconds="$(timer_to_seconds "${remaining}")"
+                if [[ -n "${remain_seconds}" && "${remain_seconds}" -gt 0 ]]; then
+                    hypr_idle_inhibit_on 2>/dev/null
+                    timer_start "${remain_seconds}"
+                    state_save "active" "${remain_seconds}" "" "${monitor}" "${lid}"
+                    restored+=("timer ${remaining}")
+                fi
+            else
+                # Timer expired during downtime — deactivate
+                state_save "inactive" "0" "" "${monitor}" "${lid}"
+            fi
+        fi
+    fi
+
+    if [[ ${#restored[@]} -gt 0 ]]; then
+        echo "${WB_PERSIST} Restored: ${restored[*]}"
+    fi
+}
+
+# ── Status ───────────────────────────────────────────────────────────────────
+
+do_status() {
+    local state monitor lid persist parts=()
+
+    state="$(state_get_status)"
+    monitor="$(state_get_monitor)"
+    lid="$(state_get_lid)"
+    persist="$(state_get_persist)"
 
     # Idle status
     if [[ "${state}" == "active" ]]; then
@@ -344,19 +432,27 @@ do_status() {
         parts+=("${ICON_LID} Lid: off")
     fi
 
+    # Persist
+    if [[ "${persist}" == "true" ]]; then
+        parts+=("${WB_PERSIST} Persist: ON")
+    else
+        parts+=("${WB_PERSIST} Persist: off")
+    fi
+
     echo "$(IFS=$' · '; echo "${parts[*]}")"
 }
 
 # ── Waybar ───────────────────────────────────────────────────────────────────
 
 do_waybar() {
-    local state monitor lid duration
+    local state monitor lid duration persist
     local timer_on="false" infinite_on="false"
 
     state="$(state_get_status)"
     monitor="$(state_get_monitor)"
     lid="$(state_get_lid)"
     duration="$(state_get_duration)"
+    persist="$(state_get_persist)"
 
     if [[ "${state}" == "active" ]]; then
         if [[ "${duration}" -eq 0 ]]; then
@@ -387,6 +483,9 @@ do_waybar() {
     if [[ "${lid}" == "true" ]]; then
         action_parts+=("${WB_LID}")
     fi
+    if [[ "${persist}" == "true" ]]; then
+        action_parts+=("${WB_PERSIST}")
+    fi
 
     local text="${cup}"
     if [[ ${#action_parts[@]} -gt 0 ]]; then
@@ -406,6 +505,9 @@ do_waybar() {
     fi
     if [[ "${lid}" == "true" ]]; then
         tooltip_parts+=("${NF_LAPTOP} Lid: Blocked")
+    fi
+    if [[ "${persist}" == "true" ]]; then
+        tooltip_parts+=("${NF_PERSIST} Persist: ON")
     fi
 
     local tooltip
@@ -534,6 +636,18 @@ main() {
                 status) watcher_status ;;
                 *)      echo "Usage: hyprcaffeine watcher <start|stop|status>" >&2; exit 1 ;;
             esac
+            ;;
+        persist)
+            local persist_action="${1:-toggle}"
+            case "${persist_action}" in
+                on)     do_persist_on ;;
+                off)    do_persist_off ;;
+                toggle) do_persist_toggle ;;
+                *)      echo "Usage: hyprcaffeine persist <on|off|toggle>" >&2; exit 1 ;;
+            esac
+            ;;
+        restore)
+            do_restore
             ;;
         tui|dashboard)
             # Launch Premium TUI (ratatui)

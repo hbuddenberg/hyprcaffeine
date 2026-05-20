@@ -62,16 +62,18 @@ for pid in $(ps -eo pid,args 2>/dev/null | grep "systemd-inhibit" | grep "HyprCa
     kill "$pid" 2>/dev/null || true
 done
 
-# Read current monitor/lid state and preserve it
+# Read current monitor/lid/persist state and preserve it
 STATE_FILE="__STATE_DIR__/state.json"
 MONITOR="false"
 LID="false"
+PERSIST="false"
 if [[ -f "$STATE_FILE" ]]; then
     MONITOR=$(grep -oP '"monitor"\s*:\s*\K(true|false)' "$STATE_FILE" 2>/dev/null || echo "false")
     LID=$(grep -oP '"lid"\s*:\s*\K(true|false)' "$STATE_FILE" 2>/dev/null || echo "false")
+    PERSIST=$(grep -oP '"persist"\s*:\s*\K(true|false)' "$STATE_FILE" 2>/dev/null || echo "false")
 fi
 
-echo "{\"status\":\"inactive\",\"duration\":0,\"activated_at\":\"\",\"pid\":\"\",\"monitor\":${MONITOR},\"lid\":${LID}}" > "$STATE_FILE"
+echo "{\"status\":\"inactive\",\"duration\":0,\"activated_at\":\"\",\"pid\":\"\",\"monitor\":${MONITOR},\"lid\":${LID},\"persist\":${PERSIST}}" > "$STATE_FILE"
 rm -f __STATE_DIR__/idle_inhibit.pid __STATE_DIR__/timer.pid
 rm -f __STATE_DIR__/.timer_worker.sh
 WORKER_EOF
@@ -149,4 +151,26 @@ timer_human() {
     else
         echo "${result}"
     fi
+}
+
+# Convert human-readable duration string back to seconds (inverse of timer_human)
+# Handles: "1h 30m", "45m", "2h", "30s", "1h 5m 10s"
+timer_to_seconds() {
+    local input="${1:-0}"
+    local total=0
+
+    # Extract hours
+    if [[ "${input}" =~ ([0-9]+)h ]]; then
+        total=$(( total + BASH_REMATCH[1] * 3600 ))
+    fi
+    # Extract minutes
+    if [[ "${input}" =~ ([0-9]+)m ]]; then
+        total=$(( total + BASH_REMATCH[1] * 60 ))
+    fi
+    # Extract seconds
+    if [[ "${input}" =~ ([0-9]+)s ]]; then
+        total=$(( total + BASH_REMATCH[1] ))
+    fi
+
+    echo "${total}"
 }
