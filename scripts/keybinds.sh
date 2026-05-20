@@ -131,6 +131,59 @@ _kb_remove_source() {
     return 1
 }
 
+# ── Omarchy Conflict Resolution ─────────────────────────────────────────────
+# If Omarchy has conflicting keybinds, comment them so HyprCaffeine takes over
+
+_KB_OMARCHY_CONFLICTS=(
+    "SUPER CTRL, I"
+    "SUPER CTRL SHIFT, I"
+    "SUPER CTRL SHIFT, D"
+    "SUPER CTRL, D"
+)
+
+_kb_resolve_omarchy_conflicts() {
+    local omarchy_dir="${HOME}/.local/share/omarchy"
+    local resolved=0
+
+    # Check multiple Omarchy binding locations
+    for conf in \
+        "${omarchy_dir}/default/hypr/bindings/"*.conf \
+        "${omarchy_dir}/config/hypr/bindings.conf" \
+        "${omarchy_dir}/config/hypr/hyprland.conf"; do
+
+        [[ -f "${conf}" ]] || continue
+
+        local modified=false
+        for combo in "${_KB_OMARCHY_CONFLICTS[@]}"; do
+            # Match lines like: bindd = SUPER CTRL, I, ... or bind = SUPER CTRL, I, ...
+            # But NOT already commented lines or hyprcaffeine's own binds
+            while IFS= read -r line; do
+                local lineno
+                lineno=$(echo "$line" | cut -d: -f1)
+                local content
+                content=$(echo "$line" | cut -d: -f2-)
+
+                # Skip if already commented or is hyprcaffeine's own file
+                if echo "$content" | grep -qE '^\s*#' || echo "$content" | grep -qi 'hyprcaffeine'; then
+                    continue
+                fi
+
+                # Comment it out
+                sed -i "${lineno}s/^/# /" "${conf}"
+                echo "  🔄 Commented Omarchy bind at ${conf##*/}:${lineno} (${combo})"
+                modified=true
+                resolved=$((resolved + 1))
+            done < <(grep -n "bind.*${combo}," "${conf}" 2>/dev/null || true)
+        done
+
+        if [[ "${modified}" == true ]]; then
+            echo "  ✓ Conflicts resolved: ${conf}"
+        fi
+    done
+
+    return "${resolved}"
+}
+
 # ── Install ───────────────────────────────────────────────────────────────────
 
 _kb_install() {
@@ -141,6 +194,9 @@ _kb_install() {
     echo "  Hyprland: ${version} → ${FORMAT} format"
 
     mkdir -p "$(dirname "${KEYBINDS_FILE}")"
+
+    # ALWAYS resolve Omarchy conflicts, regardless of whether keybinds are up-to-date
+    _kb_resolve_omarchy_conflicts
 
     # Check if already installed and up-to-date
     if [[ -f "${KEYBINDS_FILE}" ]]; then
@@ -187,6 +243,44 @@ _kb_install() {
 
 # ── Remove ────────────────────────────────────────────────────────────────────
 
+_kb_restore_omarchy() {
+    local omarchy_dir="${HOME}/.local/share/omarchy"
+    local restored=0
+
+    for conf in \
+        "${omarchy_dir}/default/hypr/bindings/"*.conf \
+        "${omarchy_dir}/config/hypr/bindings.conf" \
+        "${omarchy_dir}/config/hypr/hyprland.conf"; do
+
+        [[ -f "${conf}" ]] || continue
+
+        local modified=false
+        for combo in "${_KB_OMARCHY_CONFLICTS[@]}"; do
+            # Uncomment lines that were commented by hyprcaffeine
+            while IFS= read -r line; do
+                local lineno
+                lineno=$(echo "$line" | cut -d: -f1)
+                local content
+                content=$(echo "$line" | cut -d: -f2-)
+
+                # Only uncomment if it's a commented bind line (added by us)
+                if echo "$content" | grep -qE '^\s*#\s+bind'; then
+                    sed -i "${lineno}s/^\s*#\s*//" "${conf}"
+                    echo "  🔄 Restored Omarchy bind at ${conf##*/}:${lineno}"
+                    modified=true
+                    restored=$((restored + 1))
+                fi
+            done < <(grep -n "#.*bind.*${combo}," "${conf}" 2>/dev/null || true)
+        done
+
+        if [[ "${modified}" == true ]]; then
+            echo "  ✓ Restored: ${conf}"
+        fi
+    done
+
+    return "${restored}"
+}
+
 _kb_remove() {
     _kb_get_paths
     local removed=false
@@ -201,6 +295,9 @@ _kb_remove() {
         echo "  ✓ Removed source line from ${HYPRLAND_CONF}"
         removed=true
     fi
+
+    # Restore Omarchy binds that were commented by hyprcaffeine
+    _kb_restore_omarchy
 
     if [[ "${removed}" == false ]]; then
         echo "  ℹ No HyprCaffeine keybinds found to remove"

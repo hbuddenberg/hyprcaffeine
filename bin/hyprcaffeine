@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HyprCaffeine — Idle inhibition utility for Hyprland
-# Version: 0.7.4
+# Version: 0.7.2
 # Author: HyprCaffeine Contributors
 # License: MIT
 
@@ -18,7 +18,7 @@ else
 fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="0.7.4"
+readonly VERSION="0.7.6"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -306,6 +306,58 @@ do_lid_toggle() {
     fi
 }
 
+# ── Restore (background persistence — called by systemd on boot) ────────────
+
+do_restore() {
+    local state monitor lid duration restored=()
+
+    state="$(state_get_status)"
+    monitor="$(state_get_monitor)"
+    lid="$(state_get_lid)"
+    duration="$(state_get_duration)"
+
+    # Skip if nothing to restore
+    if [[ "${state}" != "active" && "${monitor}" != "true" && "${lid}" != "true" ]]; then
+        return 0
+    fi
+
+    # Restore monitor keep-awake
+    if [[ "${monitor}" == "true" ]]; then
+        hypr_monitor_on 2>/dev/null && restored+=("monitor")
+    fi
+
+    # Restore lid inhibit
+    if [[ "${lid}" == "true" ]]; then
+        lid_inhibit_start 2>/dev/null && restored+=("lid")
+    fi
+
+    # Restore idle inhibition (infinite always; finite timers check remaining)
+    if [[ "${state}" == "active" ]]; then
+        if [[ "${duration}" -eq 0 ]]; then
+            # Infinite mode — always restore
+            hypr_idle_inhibit_on 2>/dev/null && restored+=("infinite")
+        else
+            # Finite timer — restore only if time remaining
+            local remaining
+            remaining="$(state_get_remaining)"
+            if [[ "${remaining}" != "expired" && "${remaining}" != "unknown" ]]; then
+                local remain_seconds
+                remain_seconds="$(timer_to_seconds "${remaining}" 2>/dev/null)"
+                if [[ -n "${remain_seconds}" && "${remain_seconds}" -gt 0 ]]; then
+                    hypr_idle_inhibit_on 2>/dev/null
+                    timer_start "${remain_seconds}"
+                    restored+=("timer ${remaining}")
+                fi
+            fi
+        fi
+    fi
+
+    local num=${#restored[@]}
+    if [[ ${num} -gt 0 ]]; then
+        echo "HyprCaffeine restored ${num} state(s) on boot: ${restored[*]}"
+    fi
+}
+
 # ── Status ───────────────────────────────────────────────────────────────────
 
 do_status() {
@@ -525,6 +577,9 @@ main() {
                 status)  _kb_status ;;
                 *)       echo "Usage: hyprcaffeine keybinds <install|remove|status>" >&2; exit 1 ;;
             esac
+            ;;
+        restore)
+            do_restore
             ;;
         watcher)
             local watcher_action="${1:-}"

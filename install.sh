@@ -455,9 +455,8 @@ install_polkit_rule() {
     rule_content="$(sed "s/USER_PLACEHOLDER/${current_user}/g" "${SRC_POLKIT_RULE}")"
 
     # Write to system polkit rules directory (requires sudo)
-    local polkit_exit=0
-    echo "${rule_content}" | sudo tee "${POLKIT_RULE_TARGET}" > /dev/null 2>/dev/null || polkit_exit=$?
-    if [[ "${polkit_exit}" -eq 0 ]]; then
+    echo "${rule_content}" | sudo tee "${POLKIT_RULE_TARGET}" > /dev/null 2>/dev/null
+    if [[ $? -eq 0 ]]; then
         sudo chmod 644 "${POLKIT_RULE_TARGET}" 2>/dev/null || true
         success "Polkit rule installed → ${POLKIT_RULE_TARGET}"
         note "Rule allows user '${current_user}' to inhibit sleep without auth prompts"
