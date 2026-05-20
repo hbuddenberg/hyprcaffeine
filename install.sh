@@ -432,10 +432,9 @@ install_polkit_rule() {
         return 0
     fi
 
-    # Skip if the rule already exists (idempotent)
+    # Always install/update the rule (user may have changed or it may be outdated)
     if [[ -f "${POLKIT_RULE_TARGET}" ]]; then
-        success "Polkit rule already installed at ${POLKIT_RULE_TARGET}"
-        return 0
+        step "Updating existing polkit rule..."
     fi
 
     # Check if template exists

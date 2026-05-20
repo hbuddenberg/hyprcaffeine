@@ -1,9 +1,11 @@
-// HyprCaffeine polkit rule — allows inhibit without password prompt
+// HyprCaffeine polkit rule — allows sleep/lid inhibit without password prompt
 // Install to: /etc/polkit-1/rules.d/50-hyprcaffeine.rules
-// Replace USER_PLACEHOLDER with your actual username
+// Auto-installed by install.sh (USER_PLACEHOLDER replaced with current username)
 
 polkit.addRule(function(action, subject) {
-    if (action.id.indexOf("org.freedesktop.login1.inhibit") === 0 &&
+    if ((action.id == "org.freedesktop.login1.inhibit-block-sleep" ||
+         action.id == "org.freedesktop.login1.inhibit-delay-sleep" ||
+         action.id == "org.freedesktop.login1.inhibit-handle-lid-switch") &&
         subject.user == "USER_PLACEHOLDER") {
         return polkit.Result.YES;
     }
