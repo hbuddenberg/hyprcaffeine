@@ -599,16 +599,15 @@ do_install() {
     echo -e "  ${C_TEXT}Run:${C_RESET}  ${C_TEAL}hyprcaffeine --help${C_RESET}"
     echo -e "  ${C_TEXT}Quick:${C_RESET} ${C_TEAL}hyprcaffeine on 30m${C_RESET}"
 
-    # 7. Polkit rule (REQUIRED — abort if fails)
+    # 7. Polkit rule (REQUIRED for sleep/lid inhibition, but non-fatal for user-local install)
     if ! install_polkit_rule; then
         echo ""
-        echo -e "  ${C_RED}${C_BOLD}Polkit rule installation failed.${C_RESET}"
-        echo -e "  ${C_RED}hyprcaffeine requires polkit rules for sleep/lid inhibition.${C_RESET}"
-        echo -e "  ${C_TEXT}Re-run with sudo, or install manually:${C_RESET}"
+        echo -e "  ${C_YELLOW}${C_BOLD}Polkit rule installation failed.${C_RESET}"
+        echo -e "  ${C_YELLOW}hyprcaffeine requires polkit rules for sleep/lid inhibition.${C_RESET}"
+        echo -e "  ${C_TEXT}You can install it manually later:${C_RESET}"
         echo -e "  ${C_TEAL}sudo cp config/polkit.rules /etc/polkit-1/rules.d/50-hyprcaffeine.rules${C_RESET}"
         echo -e "  ${C_TEAL}sudo sed -i 's/USER_PLACEHOLDER/$(whoami)/g' /etc/polkit-1/rules.d/50-hyprcaffeine.rules${C_RESET}"
         echo ""
-        return 1
     fi
 
     # 8. Waybar auto-integration
