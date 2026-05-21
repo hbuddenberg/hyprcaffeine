@@ -1,111 +1,111 @@
 # Changelog
 
-Todos los cambios notables de este proyecto se documentan aquí.
+All notable changes to this project will be documented in this file.
 
-El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
 ## [0.7.7] — 2026-05-21
 
-### ⚠️ Cambios rotundos
+### ⚠️ Breaking Changes
 
-- **Polkit rule obligatoria** — la instalación aborta si la regla polkit no se puede escribir
-- **Polkit rule siempre se sobreescribe** — no existe skip, no existe "ya existe", siempre se instala
-- **`hypridle` como dependencia requerida** en PKGBUILD
+- **Polkit rule is now mandatory** — installation aborts if the polkit rule cannot be written
+- **Polkit rule always overwrites** — no skip, no "already exists" check, always installs
+- **`hypridle` added as required dependency** in PKGBUILD
 
-### Correcciones
+### Fixes
 
-- Pantalla se apagaba durante inhibit: `hypridle` no estaba corriendo
-- Polkit rule no se instalaba: era condicional (`if [ ! -f ... ]`), ahora siempre se instala
-- `hyprcaffeine.install` (`post_install`): removido check de existencia — siempre overwrites
-- `install.sh`: si polkit falla → `return 1` con instrucciones claras para instalación manual
-- `install.sh`: fallback a generación inline de polkit rule si no hay template disponible
-- `install.sh`: múltiples approaches de `sudo` (`tee` + `cp`) para mayor compatibilidad
-- `install.sh`: verificación de runtime dependency `hypridle` (warn si no está)
+- Screen turning off during inhibit: `hypridle` was not running
+- Polkit rule not installed: was conditional (`if [ ! -f ... ]`), now always installs
+- `hyprcaffeine.install` (`post_install`): removed existence check — always overwrites
+- `install.sh`: if polkit fails → `return 1` with clear manual install instructions
+- `install.sh`: inline generation fallback when no template is available
+- `install.sh`: multiple `sudo` approaches (`tee` + `cp`) for broader compatibility
+- `install.sh`: `hypridle` runtime dependency check (warns if missing)
 
 ### Tests
 
-- 55/55 tests unitarios PASS
-- 7/7 tests funcionales PASS (NUC + ASUS)
+- 55/55 unit tests PASS
+- 7/7 functional tests PASS (NUC + ASUS)
   - `on infinite` → inhibit SLEEP
   - `monitor on` → inhibit IDLE
   - `lid on` → inhibit HANDLE-LID-SWITCH
-  - `off` → preserva monitor + lid
-  - `on 5m` (timer) → countdown correcto
-  - `off --all` → todo limpio
+  - `off` → preserves monitor + lid
+  - `on 5m` (timer) → countdown correct
+  - `off --all` → everything clean
 
 ---
 
 ## [0.7.6] — 2026-05-20
 
-### Añadido
+### Added
 
-- Sistema de keybinds para Hyprland (toggle rápido por teclado)
-- Persistencia en segundo plano (monitor/lid sobreviven cerrar la app)
-- Tests de diagnóstico (`tests/test-inhibit.sh`)
+- Hyprland keybind system (quick toggle via keyboard)
+- Background persistence (monitor/lid survive app close)
+- Diagnostic tests (`tests/test-inhibit.sh`)
 
-### Correcciones
+### Fixes
 
-- Manejo de errores en inhibit — ya no falla silenciosamente
-- Polkit always-copy — la regla se copia correctamente desde el template
+- Inhibit error handling — no longer fails silently
+- Polkit always-copy — rule copies correctly from template
 
 ---
 
 ## [0.7.5] — 2026-05-18
 
-### Correcciones
+### Fixes
 
-- Revert a v0.7.4 por inestabilidad en keybinds
+- Reverted to v0.7.4 due to keybind instability
 
 ---
 
 ## [0.7.4] — 2026-05-17
 
-### Añadido
+### Added
 
-- Countdown timer con notificaciones de escritorio
-- Integración con Walker menu
-- Servicio systemd para auto-start del watcher
+- Countdown timer with desktop notifications
+- Walker menu integration
+- Systemd service for watcher auto-start
 
 ---
 
 ## [0.7.3] — 2026-05-15
 
-### Añadido
+### Added
 
-- Integración Waybar con CSS classes (Catppuccin Mocha)
-- Comando `waybar` para output JSON compatible
-- Soporte para `monitor on/off` y `lid on/off`
+- Waybar integration with CSS classes (Catppuccin Mocha)
+- `waybar` command for compatible JSON output
+- `monitor on/off` and `lid on/off` support
 
 ---
 
 ## [0.7.2] — 2026-05-12
 
-### Añadido
+### Added
 
-- Comando `toggle` para activar/desactivar rápidamente
-- Comando `status` con iconos Nerd Font
-- Soporte para duraciones (`on 30m`, `on 2h`, `on infinite`)
+- `toggle` command for quick on/off
+- `status` command with Nerd Font icons
+- Duration support (`on 30m`, `on 2h`, `on infinite`)
 
 ---
 
 ## [0.7.1] — 2026-05-10
 
-### Correcciones
+### Fixes
 
-- Fix: inhibits no se limpiaban al apagar timer
-- Fix: state file se corrompía con llamadas concurrentes
+- Inhibits not cleaned up when timer expires
+- State file corruption on concurrent calls
 
 ---
 
 ## [0.7.0] — 2026-05-08
 
-### Añadido
+### Added
 
-- Versión inicial pública
-- Inhibición de sleep/suspend vía `systemd-inhibit`
-- Inhibición de monitor (DPMS/dim)
-- Inhibición de lid-close
-- Instalador interactivo con `gum`
-- PKGBUILD para AUR
+- Initial public release
+- Sleep/suspend inhibition via `systemd-inhibit`
+- Monitor inhibition (DPMS/dim)
+- Lid-close inhibition
+- Interactive installer with `gum`
+- PKGBUILD for AUR
