@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.7.8] — 2026-05-21
+
+### Fixes
+
+- Use `-H` instead of `-h` for wofi menu height (`-h` is `--help` in wofi)
+- Prevents wofi from printing help text and accidentally toggling monitor caffeine state
+
+---
+
 ## [0.7.7] — 2026-05-21
 
 ### ⚠️ Breaking Changes

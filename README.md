@@ -4,7 +4,7 @@
 
 ### Keep your Hyprland awake — beautifully
 
-[![Version](https://img.shields.io/badge/version-0.7.7-blue.svg?style=flat-square)](https://github.com/hbuddenberg/hyprcaffeine/releases)
+[![Version](https://img.shields.io/badge/version-0.7.8-blue.svg?style=flat-square)](https://github.com/hbuddenberg/hyprcaffeine/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 [![Shell: Bash](https://img.shields.io/badge/shell-bash-4EAA25.svg?style=flat-square&logo=gnubash&logoColor=white)](https://www.gnu.org/software/bash/)
 [![Hyprland](https://img.shields.io/badge/for-Hyprland-00e09e.svg?style=flat-square)](https://github.com/hyprwm/Hyprland)
