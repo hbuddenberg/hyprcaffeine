@@ -10,8 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixes
 
-- Use `-H` instead of `-h` for wofi menu height (`-h` is `--help` in wofi)
-- Prevents wofi from printing help text and accidentally toggling monitor caffeine state
+- **Watcher**: Resolve socket path dynamically and scan runtime directories (e.g. for newer Hyprland versions v0.54.x+ that don't use `/tmp/hypr/.hyprland_instances`).
+- **Watcher**: Tolerate missing socket at startup and retry connecting in the background, preventing daemon startup pre-flight failure.
+- **Systemd**: Tolerate watcher-start failure in oneshot systemd user unit to prevent systemd from killing the restored inhibitors cgroup at boot.
+- **Installer**: Make polkit installation failure non-fatal to allow user-local installs to complete successfully.
+- Use `-H` instead of `-h` for wofi menu height (`-h` is `--help` in wofi) to prevent printing help text and toggling monitor state.
 
 ---
 
