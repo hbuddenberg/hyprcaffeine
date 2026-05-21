@@ -28,6 +28,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SRC_BIN="${SCRIPT_DIR}/bin/hyprcaffeine"
 readonly SRC_SCRIPTS="${SCRIPT_DIR}/scripts"
 readonly SRC_CONFIG="${SCRIPT_DIR}/config/default.yaml"
+readonly SRC_UI_DICT="${SCRIPT_DIR}/config/ui-dictionary.json"
 readonly SRC_WAYBAR="${SCRIPT_DIR}/waybar/module.json"
 
 # ── User Config Path (always user-owned) ─────────────────
@@ -123,6 +124,13 @@ check_deps() {
             note "Install hypridle to enable display keep-awake and idle features"
         fi
     done
+
+    if command -v socat &>/dev/null; then
+        success "socat found"
+    else
+        warn "socat not found — watcher daemon (auto-activate) will NOT work"
+        note "Install socat to enable fullscreen/audio auto-activation"
+    fi
 
     # Optional deps
     for dep in "${optional[@]}"; do
@@ -545,6 +553,18 @@ do_install() {
         success "Scripts installed → ${DATA_DIR}/scripts/ (${count} files)"
     fi
 
+    # UI dictionary — must sit at ${DATA_DIR}/config/ so scripts/ui-engine.sh
+    # can find it via ../config/ui-dictionary.json relative to scripts/.
+    if [[ -f "${SRC_UI_DICT}" ]]; then
+        if [[ "${INSTALL_MODE}" == "system" ]] && [[ "$(id -u)" -ne 0 ]]; then
+            sudo mkdir -p "${DATA_DIR}/config"
+            sudo cp "${SRC_UI_DICT}" "${DATA_DIR}/config/ui-dictionary.json"
+        else
+            mkdir -p "${DATA_DIR}/config"
+            cp "${SRC_UI_DICT}" "${DATA_DIR}/config/ui-dictionary.json"
+        fi
+    fi
+
     # 4. Install default config (only if none exists)
     step "Installing configuration..."
     if [[ -f "${SRC_CONFIG}" ]]; then
@@ -614,6 +634,10 @@ install_systemd_service() {
     cp "${src_service}" "${dst_service}"
 
     systemctl --user daemon-reload 2>/dev/null || true
+
+    # Disable first so a stale link (e.g. graphical-session.target.wants/) is
+    # removed and the next enable re-reads the current [Install] section.
+    systemctl --user disable hyprcaffeine.service 2>/dev/null || true
 
     # Enable but don't start — will activate on next login
     if systemctl --user enable hyprcaffeine.service 2>/dev/null; then

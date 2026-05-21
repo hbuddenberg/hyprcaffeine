@@ -1,14 +1,11 @@
 [Unit]
-Description=HyprCaffeine — Restore previous state on login
-After=hyprland.service
-PartOf=graphical-session.target
+Description=HyprCaffeine — restore inhibitors on user-session start
 
 [Service]
 Type=oneshot
 ExecStart=%h/.local/bin/hyprcaffeine restore
 ExecStart=%h/.local/bin/hyprcaffeine watcher start
-ExecStop=%h/.local/bin/hyprcaffeine off --all
 RemainAfterExit=yes
 
 [Install]
-WantedBy=graphical-session.target
+WantedBy=default.target

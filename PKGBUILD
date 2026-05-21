@@ -36,6 +36,9 @@ package() {
     # Default configuration
     install -Dm644 config/default.yaml "${pkgdir}/usr/share/hyprcaffeine/config/default.yaml"
 
+    # UI dictionary (consumed by scripts/ui-engine.sh — must sit one dir above scripts/)
+    install -Dm644 config/ui-dictionary.json "${pkgdir}/usr/share/hyprcaffeine/config/ui-dictionary.json"
+
     # Polkit rule template
     install -Dm644 config/polkit.rules "${pkgdir}/usr/share/hyprcaffeine/polkit.rules"
 
