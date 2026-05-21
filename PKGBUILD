@@ -1,12 +1,12 @@
 # Maintainer: Hans-Dieter Buddenberg <hbuddenberg@gmail.com>
 pkgname=hyprcaffeine
-pkgver=0.7.3
+pkgver=0.7.6
 pkgrel=1
 pkgdesc='☕ Idle inhibition utility for Hyprland — caffeine for your Wayland compositor'
 arch=(any)
 url='https://github.com/hbuddenberg/hyprcaffeine'
 license=(MIT)
-depends=(bash jq hyprland socat)
+depends=(bash jq hyprland hypridle socat)
 optdepends=(
     'gum: interactive menu and styled prompts'
     'libnotify: desktop notifications'

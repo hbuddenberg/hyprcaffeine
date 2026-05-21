@@ -100,6 +100,7 @@ check_deps() {
     header "Checking Dependencies"
 
     local -a required=("hyprctl" "jq" "notify-send")
+    local -a runtime=("hypridle")
     local -a optional=("gum")
     local -a missing=()
 
@@ -110,6 +111,16 @@ check_deps() {
         else
             error "${dep} NOT found"
             missing+=("$dep")
+        fi
+    done
+
+    # Runtime deps (warn but don't block install)
+    for dep in "${runtime[@]}"; do
+        if command -v "$dep" &>/dev/null; then
+            success "${dep} found"
+        else
+            warn "${dep} not found — idle inhibition (screen dim/dpms/lock) will NOT work"
+            note "Install hypridle to enable display keep-awake and idle features"
         fi
     done
 
@@ -423,46 +434,76 @@ readonly POLKIT_RULE_TARGET="/etc/polkit-1/rules.d/50-hyprcaffeine.rules"
 readonly SRC_POLKIT_RULE="${SCRIPT_DIR}/config/polkit.rules"
 
 install_polkit_rule() {
-    header "Polkit Rule"
+    header "Polkit Rule (required for sleep/lid inhibition)"
 
-    # Check if polkit rules directory exists
-    if [[ ! -d "/etc/polkit-1/rules.d" ]]; then
-        warn "Polkit rules directory not found (/etc/polkit-1/rules.d)"
-        note "Polkit rule installation skipped — systemd-inhibit may require manual auth"
-        return 0
+    # Resolve template: repo source > installed data dir > bundled
+    local rule_template=""
+    if [[ -f "${SRC_POLKIT_RULE}" ]]; then
+        rule_template="${SRC_POLKIT_RULE}"
+    elif [[ -f "${DATA_DIR}/../config/polkit.rules" ]]; then
+        rule_template="${DATA_DIR}/../config/polkit.rules"
+    elif [[ -f "/usr/share/hyprcaffeine/polkit.rules" ]]; then
+        rule_template="/usr/share/hyprcaffeine/polkit.rules"
     fi
 
-    # Always install/update the rule (user may have changed or it may be outdated)
+    if [[ -z "${rule_template}" ]]; then
+        warn "Polkit rule template not found — generating inline"
+        local rule_content_inline
+        rule_content_inline="// HyprCaffeine polkit rule — auto-generated
+polkit.addRule(function(action, subject) {
+    if ((action.id == \"org.freedesktop.login1.inhibit-block-sleep\" ||
+         action.id == \"org.freedesktop.login1.inhibit-delay-sleep\" ||
+         action.id == \"org.freedesktop.login1.inhibit-handle-lid-switch\") &&
+        subject.user == \"$(whoami)\") {
+        return polkit.Result.YES;
+    }
+});"
+        # Create temp file for inline rule
+        rule_template="$(mktemp)"
+        echo "${rule_content_inline}" > "${rule_template}"
+    fi
+
+    # Always overwrite — ensures correct user and up-to-date rules
     if [[ -f "${POLKIT_RULE_TARGET}" ]]; then
-        step "Updating existing polkit rule..."
+        step "Overwriting existing polkit rule..."
+    else
+        step "Installing polkit rule for idle inhibition..."
     fi
-
-    # Check if template exists
-    if [[ ! -f "${SRC_POLKIT_RULE}" ]]; then
-        warn "Polkit rule template not found at ${SRC_POLKIT_RULE}"
-        note "Skipping polkit rule installation"
-        return 0
-    fi
-
-    step "Installing polkit rule for idle inhibition..."
 
     # Inject current username into the template
     local current_user
     current_user="$(whoami)"
 
     local rule_content
-    rule_content="$(sed "s/USER_PLACEHOLDER/${current_user}/g" "${SRC_POLKIT_RULE}")"
+    rule_content="$(sed "s/USER_PLACEHOLDER/${current_user}/g" "${rule_template}")"
 
-    # Write to system polkit rules directory (requires sudo)
-    echo "${rule_content}" | sudo tee "${POLKIT_RULE_TARGET}" > /dev/null 2>/dev/null
-    if [[ $? -eq 0 ]]; then
-        sudo chmod 644 "${POLKIT_RULE_TARGET}" 2>/dev/null || true
-        success "Polkit rule installed → ${POLKIT_RULE_TARGET}"
-        note "Rule allows user '${current_user}' to inhibit sleep without auth prompts"
+    # Try writing to system polkit rules directory
+    if [[ -d "/etc/polkit-1/rules.d" ]]; then
+        # Write to temp first, then sudo cp (works with sudo -S from piped stdin)
+        local tmp_rules
+        tmp_rules="$(mktemp)"
+        echo "${rule_content}" > "${tmp_rules}"
+
+        # Try multiple sudo approaches
+        if echo "${rule_content}" | sudo tee "${POLKIT_RULE_TARGET}" > /dev/null 2>/dev/null; then
+            sudo chmod 644 "${POLKIT_RULE_TARGET}" 2>/dev/null || true
+            success "Polkit rule installed → ${POLKIT_RULE_TARGET}"
+            note "Rule allows user '${current_user}' to inhibit sleep/lid without auth prompts"
+        elif sudo cp "${tmp_rules}" "${POLKIT_RULE_TARGET}" 2>/dev/null; then
+            sudo chmod 644 "${POLKIT_RULE_TARGET}" 2>/dev/null || true
+            success "Polkit rule installed → ${POLKIT_RULE_TARGET}"
+            note "Rule allows user '${current_user}' to inhibit sleep/lid without auth prompts"
+        else
+            error "FAILED to write polkit rule — sudo authentication required"
+            note "Manual: sudo cp ${rule_template} ${POLKIT_RULE_TARGET}"
+            note "Then run: sudo chmod 644 ${POLKIT_RULE_TARGET}"
+            rm -f "${tmp_rules}"
+            return 1
+        fi
+        rm -f "${tmp_rules}"
     else
-        warn "Could not write polkit rule (sudo may be required)"
-        note "Manual install: sudo cp ${SRC_POLKIT_RULE} ${POLKIT_RULE_TARGET}"
-        note "Then replace USER_PLACEHOLDER with your username"
+        warn "Polkit rules directory not found (/etc/polkit-1/rules.d)"
+        note "systemd-inhibit may require manual authentication for sleep/lid"
     fi
 }
 
@@ -538,8 +579,17 @@ do_install() {
     echo -e "  ${C_TEXT}Run:${C_RESET}  ${C_TEAL}hyprcaffeine --help${C_RESET}"
     echo -e "  ${C_TEXT}Quick:${C_RESET} ${C_TEAL}hyprcaffeine on 30m${C_RESET}"
 
-    # 7. Polkit rule
-    install_polkit_rule
+    # 7. Polkit rule (REQUIRED — abort if fails)
+    if ! install_polkit_rule; then
+        echo ""
+        echo -e "  ${C_RED}${C_BOLD}Polkit rule installation failed.${C_RESET}"
+        echo -e "  ${C_RED}hyprcaffeine requires polkit rules for sleep/lid inhibition.${C_RESET}"
+        echo -e "  ${C_TEXT}Re-run with sudo, or install manually:${C_RESET}"
+        echo -e "  ${C_TEAL}sudo cp config/polkit.rules /etc/polkit-1/rules.d/50-hyprcaffeine.rules${C_RESET}"
+        echo -e "  ${C_TEAL}sudo sed -i 's/USER_PLACEHOLDER/$(whoami)/g' /etc/polkit-1/rules.d/50-hyprcaffeine.rules${C_RESET}"
+        echo ""
+        return 1
+    fi
 
     # 8. Waybar auto-integration
     integrate_waybar
