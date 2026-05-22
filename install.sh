@@ -615,6 +615,19 @@ do_install() {
 
     # 9. Systemd user service
     install_systemd_service
+
+    # 10. Hyprland keybindings
+    install_keybinds
+}
+
+# ── Keybindings ──────────────────────────────────────────
+install_keybinds() {
+    step "Installing Hyprland keybindings..."
+    if "${BIN_DIR}/hyprcaffeine" keybinds install 2>/dev/null; then
+        success "Keybindings installed"
+    else
+        warn "Could not install keybindings — run manually: hyprcaffeine keybinds install"
+    fi
 }
 
 # ── Systemd User Service ──────────────────────────────────
