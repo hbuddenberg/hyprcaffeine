@@ -11,17 +11,6 @@ SHARE_DIR="/usr/share/hyprcaffeine"
 
 echo "  Auto-configuring for: $(whoami)"
 
-# ── Polkit ──
-PolkitFile="${SHARE_DIR}/polkit.rules"
-PolkitDir="/etc/polkit-1/actions"
-if [[ -f "$PolkitFile" ]] && [[ -d "$PolkitDir" ]]; then
-    # Polkit needs root — use the base64 trick from hyprcaffeine.install
-    if command -v hyprcaffeine &>/dev/null; then
-        hyprcaffeine polkit install 2>/dev/null && \
-            echo "  ✅ Polkit rule installed" || true
-    fi
-fi
-
 # ── Waybar — delegate to CLI ──
 if command -v hyprcaffeine &>/dev/null; then
     hyprcaffeine waybar-setup

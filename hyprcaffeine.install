@@ -27,9 +27,9 @@ post_install() {
             echo "  ⚠️  Polkit rule install failed — sleep/lid inhibition may require auth prompts"
     fi
 
-    # 2. Waybar + 3. Systemd — run as the user
+    # 2. Waybar + 3. Systemd + 4. Keybinds — run as the user
     if [ -x /usr/share/hyprcaffeine/scripts/post-install.sh ]; then
-        su - "$_user" -c "bash /usr/share/hyprcaffeine/scripts/post-install.sh" 2>/dev/null
+        runuser -l "$_user" -c "bash /usr/share/hyprcaffeine/scripts/post-install.sh" 2>/dev/null
     fi
 
     echo ""
