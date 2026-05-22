@@ -618,7 +618,7 @@ do_setup() {
         echo "        ✅ Already installed"
     else
         echo "        Not found — attempting install..."
-        if do_polkit_install 2>/dev/null; then
+        if do_polkit_install; then
             echo "        ✅ Polkit installed"
         else
             echo "        ⚠️  Skipped — run: sudo hyprcaffeine polkit install"

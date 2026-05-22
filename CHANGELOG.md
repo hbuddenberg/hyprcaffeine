@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixes
 
 - **Installer (.install)**: Replace `su -` with `runuser -l` for user-context post-install steps, ensuring reliable execution in pacman hook environment (no TTY).
+- **Installer (.install)**: Remove `2>/dev/null` from `polkit-setup.sh` call in `post_install` hook so failures are visible instead of silent.
+- **polkit-setup.sh**: Add `mkdir -p` for the rules directory before writing the rule file.
+- **setup subcommand**: Remove `2>/dev/null` suppression from `do_polkit_install` call so errors surface to the user.
 - **post-install.sh**: Remove dead `hyprcaffeine polkit install` call (subcommand does not exist); polkit rule is correctly installed in the root context by the pacman `.install` hook.
 - **Version**: Bump binary `VERSION` to `0.8.0`.
 

@@ -13,6 +13,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
     exit 1
 fi
 
+mkdir -p "$(dirname "${RULES_FILE}")"
 cat > "${RULES_FILE}" <<'EOF'
 // HyprCaffeine polkit rules
 // Allow the active user to inhibit sleep and lid-switch without authentication
