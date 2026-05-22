@@ -28,6 +28,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SRC_BIN="${SCRIPT_DIR}/bin/hyprcaffeine"
 readonly SRC_SCRIPTS="${SCRIPT_DIR}/scripts"
 readonly SRC_CONFIG="${SCRIPT_DIR}/config/default.yaml"
+readonly SRC_UI_DICT="${SCRIPT_DIR}/config/ui-dictionary.json"
 readonly SRC_WAYBAR="${SCRIPT_DIR}/waybar/module.json"
 
 # ── User Config Path (always user-owned) ─────────────────
@@ -100,6 +101,7 @@ check_deps() {
     header "Checking Dependencies"
 
     local -a required=("hyprctl" "jq" "notify-send")
+    local -a runtime=("hypridle")
     local -a optional=("gum")
     local -a missing=()
 
@@ -112,6 +114,23 @@ check_deps() {
             missing+=("$dep")
         fi
     done
+
+    # Runtime deps (warn but don't block install)
+    for dep in "${runtime[@]}"; do
+        if command -v "$dep" &>/dev/null; then
+            success "${dep} found"
+        else
+            warn "${dep} not found — idle inhibition (screen dim/dpms/lock) will NOT work"
+            note "Install hypridle to enable display keep-awake and idle features"
+        fi
+    done
+
+    if command -v socat &>/dev/null; then
+        success "socat found"
+    else
+        warn "socat not found — watcher daemon (auto-activate) will NOT work"
+        note "Install socat to enable fullscreen/audio auto-activation"
+    fi
 
     # Optional deps
     for dep in "${optional[@]}"; do
@@ -423,47 +442,76 @@ readonly POLKIT_RULE_TARGET="/etc/polkit-1/rules.d/50-hyprcaffeine.rules"
 readonly SRC_POLKIT_RULE="${SCRIPT_DIR}/config/polkit.rules"
 
 install_polkit_rule() {
-    header "Polkit Rule"
+    header "Polkit Rule (required for sleep/lid inhibition)"
 
-    # Check if polkit rules directory exists
-    if [[ ! -d "/etc/polkit-1/rules.d" ]]; then
-        warn "Polkit rules directory not found (/etc/polkit-1/rules.d)"
-        note "Polkit rule installation skipped — systemd-inhibit may require manual auth"
-        return 0
+    # Resolve template: repo source > installed data dir > bundled
+    local rule_template=""
+    if [[ -f "${SRC_POLKIT_RULE}" ]]; then
+        rule_template="${SRC_POLKIT_RULE}"
+    elif [[ -f "${DATA_DIR}/../config/polkit.rules" ]]; then
+        rule_template="${DATA_DIR}/../config/polkit.rules"
+    elif [[ -f "/usr/share/hyprcaffeine/polkit.rules" ]]; then
+        rule_template="/usr/share/hyprcaffeine/polkit.rules"
     fi
 
-    # Skip if the rule already exists (idempotent)
+    if [[ -z "${rule_template}" ]]; then
+        warn "Polkit rule template not found — generating inline"
+        local rule_content_inline
+        rule_content_inline="// HyprCaffeine polkit rule — auto-generated
+polkit.addRule(function(action, subject) {
+    if ((action.id == \"org.freedesktop.login1.inhibit-block-sleep\" ||
+         action.id == \"org.freedesktop.login1.inhibit-delay-sleep\" ||
+         action.id == \"org.freedesktop.login1.inhibit-handle-lid-switch\") &&
+        subject.user == \"$(whoami)\") {
+        return polkit.Result.YES;
+    }
+});"
+        # Create temp file for inline rule
+        rule_template="$(mktemp)"
+        echo "${rule_content_inline}" > "${rule_template}"
+    fi
+
+    # Always overwrite — ensures correct user and up-to-date rules
     if [[ -f "${POLKIT_RULE_TARGET}" ]]; then
-        success "Polkit rule already installed at ${POLKIT_RULE_TARGET}"
-        return 0
+        step "Overwriting existing polkit rule..."
+    else
+        step "Installing polkit rule for idle inhibition..."
     fi
-
-    # Check if template exists
-    if [[ ! -f "${SRC_POLKIT_RULE}" ]]; then
-        warn "Polkit rule template not found at ${SRC_POLKIT_RULE}"
-        note "Skipping polkit rule installation"
-        return 0
-    fi
-
-    step "Installing polkit rule for idle inhibition..."
 
     # Inject current username into the template
     local current_user
     current_user="$(whoami)"
 
     local rule_content
-    rule_content="$(sed "s/USER_PLACEHOLDER/${current_user}/g" "${SRC_POLKIT_RULE}")"
+    rule_content="$(sed "s/USER_PLACEHOLDER/${current_user}/g" "${rule_template}")"
 
-    # Write to system polkit rules directory (requires sudo)
-    echo "${rule_content}" | sudo tee "${POLKIT_RULE_TARGET}" > /dev/null 2>/dev/null
-    if [[ $? -eq 0 ]]; then
-        sudo chmod 644 "${POLKIT_RULE_TARGET}" 2>/dev/null || true
-        success "Polkit rule installed → ${POLKIT_RULE_TARGET}"
-        note "Rule allows user '${current_user}' to inhibit sleep without auth prompts"
+    # Try writing to system polkit rules directory
+    if [[ -d "/etc/polkit-1/rules.d" ]]; then
+        # Write to temp first, then sudo cp (works with sudo -S from piped stdin)
+        local tmp_rules
+        tmp_rules="$(mktemp)"
+        echo "${rule_content}" > "${tmp_rules}"
+
+        # Try multiple sudo approaches
+        if echo "${rule_content}" | sudo tee "${POLKIT_RULE_TARGET}" > /dev/null 2>/dev/null; then
+            sudo chmod 644 "${POLKIT_RULE_TARGET}" 2>/dev/null || true
+            success "Polkit rule installed → ${POLKIT_RULE_TARGET}"
+            note "Rule allows user '${current_user}' to inhibit sleep/lid without auth prompts"
+        elif sudo cp "${tmp_rules}" "${POLKIT_RULE_TARGET}" 2>/dev/null; then
+            sudo chmod 644 "${POLKIT_RULE_TARGET}" 2>/dev/null || true
+            success "Polkit rule installed → ${POLKIT_RULE_TARGET}"
+            note "Rule allows user '${current_user}' to inhibit sleep/lid without auth prompts"
+        else
+            error "FAILED to write polkit rule — sudo authentication required"
+            note "Manual: sudo cp ${rule_template} ${POLKIT_RULE_TARGET}"
+            note "Then run: sudo chmod 644 ${POLKIT_RULE_TARGET}"
+            rm -f "${tmp_rules}"
+            return 1
+        fi
+        rm -f "${tmp_rules}"
     else
-        warn "Could not write polkit rule (sudo may be required)"
-        note "Manual install: sudo cp ${SRC_POLKIT_RULE} ${POLKIT_RULE_TARGET}"
-        note "Then replace USER_PLACEHOLDER with your username"
+        warn "Polkit rules directory not found (/etc/polkit-1/rules.d)"
+        note "systemd-inhibit may require manual authentication for sleep/lid"
     fi
 }
 
@@ -505,6 +553,18 @@ do_install() {
         success "Scripts installed → ${DATA_DIR}/scripts/ (${count} files)"
     fi
 
+    # UI dictionary — must sit at ${DATA_DIR}/config/ so scripts/ui-engine.sh
+    # can find it via ../config/ui-dictionary.json relative to scripts/.
+    if [[ -f "${SRC_UI_DICT}" ]]; then
+        if [[ "${INSTALL_MODE}" == "system" ]] && [[ "$(id -u)" -ne 0 ]]; then
+            sudo mkdir -p "${DATA_DIR}/config"
+            sudo cp "${SRC_UI_DICT}" "${DATA_DIR}/config/ui-dictionary.json"
+        else
+            mkdir -p "${DATA_DIR}/config"
+            cp "${SRC_UI_DICT}" "${DATA_DIR}/config/ui-dictionary.json"
+        fi
+    fi
+
     # 4. Install default config (only if none exists)
     step "Installing configuration..."
     if [[ -f "${SRC_CONFIG}" ]]; then
@@ -539,14 +599,35 @@ do_install() {
     echo -e "  ${C_TEXT}Run:${C_RESET}  ${C_TEAL}hyprcaffeine --help${C_RESET}"
     echo -e "  ${C_TEXT}Quick:${C_RESET} ${C_TEAL}hyprcaffeine on 30m${C_RESET}"
 
-    # 7. Polkit rule
-    install_polkit_rule
+    # 7. Polkit rule (REQUIRED for sleep/lid inhibition, but non-fatal for user-local install)
+    if ! install_polkit_rule; then
+        echo ""
+        echo -e "  ${C_YELLOW}${C_BOLD}Polkit rule installation failed.${C_RESET}"
+        echo -e "  ${C_YELLOW}hyprcaffeine requires polkit rules for sleep/lid inhibition.${C_RESET}"
+        echo -e "  ${C_TEXT}You can install it manually later:${C_RESET}"
+        echo -e "  ${C_TEAL}sudo cp config/polkit.rules /etc/polkit-1/rules.d/50-hyprcaffeine.rules${C_RESET}"
+        echo -e "  ${C_TEAL}sudo sed -i 's/USER_PLACEHOLDER/$(whoami)/g' /etc/polkit-1/rules.d/50-hyprcaffeine.rules${C_RESET}"
+        echo ""
+    fi
 
     # 8. Waybar auto-integration
     integrate_waybar
 
     # 9. Systemd user service
     install_systemd_service
+
+    # 10. Hyprland keybindings
+    install_keybinds
+}
+
+# ── Keybindings ──────────────────────────────────────────
+install_keybinds() {
+    step "Installing Hyprland keybindings..."
+    if "${BIN_DIR}/hyprcaffeine" keybinds install 2>/dev/null; then
+        success "Keybindings installed"
+    else
+        warn "Could not install keybindings — run manually: hyprcaffeine keybinds install"
+    fi
 }
 
 # ── Systemd User Service ──────────────────────────────────
@@ -565,6 +646,10 @@ install_systemd_service() {
     cp "${src_service}" "${dst_service}"
 
     systemctl --user daemon-reload 2>/dev/null || true
+
+    # Disable first so a stale link (e.g. graphical-session.target.wants/) is
+    # removed and the next enable re-reads the current [Install] section.
+    systemctl --user disable hyprcaffeine.service 2>/dev/null || true
 
     # Enable but don't start — will activate on next login
     if systemctl --user enable hyprcaffeine.service 2>/dev/null; then

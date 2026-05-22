@@ -32,6 +32,9 @@ if [[ -f "${SHARE_DIR}/systemd/hyprcaffeine.service" ]]; then
     mkdir -p "$HOME/.config/systemd/user"
     cp "${SHARE_DIR}/systemd/hyprcaffeine.service" "$HOME/.config/systemd/user/"
     systemctl --user daemon-reload 2>/dev/null
+    # Disable first so a stale link (e.g. graphical-session.target.wants/) is
+    # removed and the next enable re-reads the current [Install] section.
+    systemctl --user disable hyprcaffeine.service 2>/dev/null
     systemctl --user enable hyprcaffeine.service 2>/dev/null && \
         echo "  ✅ Systemd service enabled" || true
 fi

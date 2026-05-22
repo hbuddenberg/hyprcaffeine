@@ -15,26 +15,47 @@ WATCHER_AUTO_FILE="${WATCHER_STATE_DIR}/watcher.auto"
 # ── Resolve the Hyprland event socket ────────────────────────────────────────
 _watcher_get_socket() {
     local sig="${HYPRLAND_INSTANCE_SIGNATURE:-}"
-    if [[ -z "${sig}" ]]; then
-        # Try to get it from the environment of a running Hyprland session
-        sig="$(cat /tmp/hypr/.hyprland_instances 2>/dev/null | head -1)"
-        if [[ -z "${sig}" ]]; then
-            return 1
+    local xdg_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+    # 1. If we have a signature (from env or legacy file), check it first
+    if [[ -n "${sig}" ]]; then
+        local socket="${xdg_dir}/hypr/${sig}/.socket2.sock"
+        if [[ -S "${socket}" ]]; then
+            echo "${socket}"
+            return 0
+        fi
+        socket="/tmp/hypr/${sig}/.socket2.sock"
+        if [[ -S "${socket}" ]]; then
+            echo "${socket}"
+            return 0
         fi
     fi
-    # Try XDG_RUNTIME_DIR first (Hyprland 0.54.x default), then /tmp
-    local xdg_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-    local socket="${xdg_dir}/hypr/${sig}/.socket2.sock"
-    if [[ -S "${socket}" ]]; then
-        echo "${socket}"
-        return 0
+
+    # 2. Check legacy instances file
+    if [[ -z "${sig}" ]]; then
+        sig="$(cat /tmp/hypr/.hyprland_instances 2>/dev/null | head -1)"
+        if [[ -n "${sig}" ]]; then
+            local socket="${xdg_dir}/hypr/${sig}/.socket2.sock"
+            if [[ -S "${socket}" ]]; then
+                echo "${socket}"
+                return 0
+            fi
+            socket="/tmp/hypr/${sig}/.socket2.sock"
+            if [[ -S "${socket}" ]]; then
+                echo "${socket}"
+                return 0
+            fi
+        fi
     fi
-    # Fallback to /tmp (older Hyprland versions)
-    socket="/tmp/hypr/${sig}/.socket2.sock"
-    if [[ -S "${socket}" ]]; then
-        echo "${socket}"
-        return 0
-    fi
+
+    # 3. Dynamic scan of directories for active socket (works with newer Hyprland)
+    for dir in "${xdg_dir}/hypr"/* "/tmp/hypr"/*; do
+        if [[ -S "${dir}/.socket2.sock" ]]; then
+            echo "${dir}/.socket2.sock"
+            return 0
+        fi
+    done
+
     return 1
 }
 
@@ -353,9 +374,7 @@ watcher_start() {
 
     # Ensure we can find the Hyprland socket
     if ! _watcher_get_socket &>/dev/null; then
-        echo "Error: Cannot find Hyprland event socket." >&2
-        echo "Make sure HYPRLAND_INSTANCE_SIGNATURE is set or Hyprland is running." >&2
-        return 1
+        echo "⚠ Warning: Hyprland event socket not found. The daemon will start and retry in the background." >&2
     fi
 
     # Clear any stop file

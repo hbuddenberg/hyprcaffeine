@@ -18,7 +18,7 @@ else
 fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="0.7.6"
+readonly VERSION="0.7.8"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -165,12 +165,14 @@ do_on() {
     fi
 
     # Activate idle inhibitor
+    local inhibit_ok=true
     if [[ "${DRY_RUN}" == true ]]; then
         echo "[dry-run] idle inhibitor ON"
     else
-        hypr_idle_inhibit_on || {
-            echo "Warning: Could not reach Hyprland — state saved anyway." >&2
-        }
+        if ! hypr_idle_inhibit_on; then
+            inhibit_ok=false
+            echo "Warning: Sleep inhibitor failed — check polkit rules." >&2
+        fi
     fi
 
     # Preserve current monitor/lid state
@@ -178,8 +180,18 @@ do_on() {
     monitor_val="$(state_get_monitor)"
     lid_val="$(state_get_lid)"
 
-    state_save "active" "${duration_seconds}" "" "${monitor_val}" "${lid_val}"
-    timer_start "${duration_seconds}"
+    if [[ "${inhibit_ok}" == true ]]; then
+        state_save "active" "${duration_seconds}" "" "${monitor_val}" "${lid_val}"
+        timer_start "${duration_seconds}"
+    else
+        # Inhibitor failed — still save state so monitor/lid persist,
+        # but mark as inactive since sleep isn't blocked
+        state_save "inactive" "0" "" "${monitor_val}" "${lid_val}"
+        notify_error "Sleep inhibitor failed — check polkit rules"
+        echo "Error: Could not activate sleep inhibition." >&2
+        echo "  Install polkit rules: sudo bash scripts/polkit-setup.sh" >&2
+        return 1
+    fi
 
     local human_duration
     if [[ "${duration_seconds}" -eq 0 ]]; then
@@ -239,10 +251,10 @@ do_monitor_on() {
         echo "[dry-run] monitor keep-awake ON"
         return
     fi
-    hypr_monitor_on || {
-        echo "Warning: Monitor control failed." >&2
+    if ! hypr_monitor_on; then
+        echo "Error: Monitor inhibitor failed." >&2
         return 1
-    }
+    fi
     state_set_monitor "true"
     echo "${ICON_MONITOR} Monitor keep-awake: ON"
     notify_send "${ICON_MONITOR} Monitor" "Keep display on: enabled"
@@ -276,10 +288,10 @@ do_lid_on() {
         echo "[dry-run] lid inhibit ON"
         return
     fi
-    lid_inhibit_start || {
-        echo "Warning: Lid inhibition failed." >&2
+    if ! lid_inhibit_start; then
+        echo "Error: Lid inhibitor failed — check polkit rules." >&2
         return 1
-    }
+    fi
     state_set_lid "true"
     echo "${ICON_LID} Lid-close inhibit: ON"
     notify_send "${ICON_LID} Lid" "Lid-close inhibit: enabled"

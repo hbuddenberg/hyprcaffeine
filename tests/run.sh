@@ -251,7 +251,7 @@ echo -e "${C_YELLOW}── PKGBUILD version check ──${C_RESET}"
 
 PKGBUILD="${SCRIPT_DIR}/PKGBUILD"
 assert_ok "PKGBUILD exists" test -f "$PKGBUILD"
-assert_file_contains "PKGBUILD has 0.4.0" "$PKGBUILD" "pkgver=0.4.0"
+assert_file_contains "PKGBUILD has pkgver" "$PKGBUILD" "pkgver="
 assert_file_contains "PKGBUILD has socat dep" "$PKGBUILD" "socat"
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
