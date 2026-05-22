@@ -90,6 +90,10 @@ SUBCOMMANDS:
     waybar-remove       Remove waybar integration
     keybinds install|remove|status  Manage Hyprland keybindings
     watcher start|stop|status  Auto-activate daemon
+    polkit install|remove|status  Manage polkit rule (requires sudo)
+    setup               Run post-install configuration (polkit + waybar + systemd + keybinds)
+    reinstall           Re-run setup (alias for setup)
+    uninstall           Remove HyprCaffeine and all user files
 
 DURATION FORMATS:
     30s, 15m, 2h, 1:30 (HH:MM), infinite, bare number = minutes
@@ -519,6 +523,219 @@ do_waybar_engine() {
     bash "${LIB_DIR}/ui-engine.sh" waybar
 }
 
+# ── Polkit Rule Management ────────────────────────────────────────────────────
+
+do_polkit_status() {
+    local rule="/etc/polkit-1/rules.d/50-hyprcaffeine.rules"
+    if [[ -f "${rule}" ]]; then
+        echo "Polkit rule: installed"
+        echo "  Path: ${rule}"
+        if grep -q "wheel" "${rule}" 2>/dev/null; then
+            echo "  Grant: wheel group members"
+        else
+            echo "  Grant: specific user"
+        fi
+    else
+        echo "Polkit rule: NOT installed"
+        echo "  Sleep/lid inhibition requires auth prompts"
+        echo "  Fix: hyprcaffeine polkit install"
+    fi
+}
+
+do_polkit_install() {
+    local polkit_script=""
+    for candidate in \
+        "/usr/share/hyprcaffeine/scripts/polkit-setup.sh" \
+        "${HOME}/.local/share/hyprcaffeine/scripts/polkit-setup.sh" \
+        "${LIB_DIR}/polkit-setup.sh"; do
+        if [[ -f "${candidate}" ]]; then
+            polkit_script="${candidate}"
+            break
+        fi
+    done
+
+    if [[ -z "${polkit_script}" ]]; then
+        echo "Error: polkit-setup.sh not found" >&2; return 1
+    fi
+
+    if [[ "$(id -u)" -eq 0 ]]; then
+        bash "${polkit_script}"
+    elif command -v sudo &>/dev/null; then
+        echo "Installing polkit rule (sudo required):"
+        sudo bash "${polkit_script}"
+    else
+        echo "Error: sudo required to install polkit rule" >&2
+        echo "Run: sudo bash ${polkit_script}" >&2
+        return 1
+    fi
+}
+
+do_polkit_remove() {
+    local rule="/etc/polkit-1/rules.d/50-hyprcaffeine.rules"
+    if [[ ! -f "${rule}" ]]; then
+        echo "Polkit rule not installed — nothing to remove"
+        return 0
+    fi
+    if [[ "$(id -u)" -eq 0 ]]; then
+        rm -f "${rule}"
+    elif command -v sudo &>/dev/null; then
+        sudo rm -f "${rule}"
+    else
+        echo "Error: sudo required to remove polkit rule" >&2
+        echo "Run: sudo rm ${rule}" >&2
+        return 1
+    fi
+    echo "Polkit rule removed"
+}
+
+# ── Setup (post-install) ──────────────────────────────────────────────────────
+
+_setup_systemd_service() {
+    local src_service=""
+    for candidate in \
+        "/usr/share/hyprcaffeine/systemd/hyprcaffeine.service" \
+        "${HOME}/.local/share/hyprcaffeine/systemd/hyprcaffeine.service"; do
+        if [[ -f "${candidate}" ]]; then
+            src_service="${candidate}"
+            break
+        fi
+    done
+    [[ -z "${src_service}" ]] && return 1
+
+    mkdir -p "${HOME}/.config/systemd/user"
+    cp "${src_service}" "${HOME}/.config/systemd/user/hyprcaffeine.service"
+    systemctl --user daemon-reload 2>/dev/null
+    systemctl --user disable hyprcaffeine.service 2>/dev/null
+    systemctl --user enable hyprcaffeine.service 2>/dev/null
+}
+
+do_setup() {
+    echo "  󰒲 HyprCaffeine — Post-install Setup"
+    echo ""
+
+    echo "  [1/4] Polkit rule (sleep/lid inhibition)..."
+    if [[ -f "/etc/polkit-1/rules.d/50-hyprcaffeine.rules" ]]; then
+        echo "        ✅ Already installed"
+    else
+        echo "        Not found — attempting install..."
+        if do_polkit_install 2>/dev/null; then
+            echo "        ✅ Polkit installed"
+        else
+            echo "        ⚠️  Skipped — run: sudo hyprcaffeine polkit install"
+        fi
+    fi
+
+    echo "  [2/4] Waybar integration..."
+    if bash "${LIB_DIR}/waybar-setup.sh" 2>/dev/null; then
+        echo "        ✅ Waybar done"
+    else
+        echo "        ⚠️  Waybar skipped"
+    fi
+
+    echo "  [3/4] Systemd user service..."
+    if _setup_systemd_service 2>/dev/null; then
+        echo "        ✅ Service enabled"
+    else
+        echo "        ⚠️  Service file not found — skipped"
+    fi
+
+    echo "  [4/4] Hyprland keybindings..."
+    if _kb_install 2>/dev/null; then
+        echo "        ✅ Keybindings installed"
+    else
+        echo "        ⚠️  Keybindings skipped"
+    fi
+
+    echo ""
+    echo "  Setup complete! Run: hyprcaffeine status"
+}
+
+# ── Uninstall (self) ──────────────────────────────────────────────────────────
+
+do_uninstall_self() {
+    echo "  󰒲 HyprCaffeine — Uninstall"
+    echo ""
+
+    # Detect install method
+    local install_mode="unknown"
+    if command -v pacman &>/dev/null && pacman -Q hyprcaffeine &>/dev/null 2>&1; then
+        install_mode="aur"
+    elif [[ -f "/usr/local/bin/hyprcaffeine" ]]; then
+        install_mode="system"
+    elif [[ -f "${HOME}/.local/bin/hyprcaffeine" ]]; then
+        install_mode="user"
+    fi
+
+    if [[ "${install_mode}" == "aur" ]]; then
+        echo "  Installed via pacman/AUR. To remove the package run:"
+        echo "    yay -R hyprcaffeine"
+        echo "    paru -R hyprcaffeine"
+        echo "    sudo pacman -R hyprcaffeine"
+        echo ""
+        echo "  Continuing to clean up user files..."
+        echo ""
+    fi
+
+    # Stop running state first
+    watcher_stop 2>/dev/null || true
+    do_off "--all" 2>/dev/null || true
+
+    echo "  Removing keybindings..."
+    _kb_remove 2>/dev/null || true
+
+    echo "  Removing waybar integration..."
+    bash "${LIB_DIR}/waybar-remove.sh" 2>/dev/null || true
+
+    echo "  Disabling systemd service..."
+    systemctl --user disable --now hyprcaffeine.service 2>/dev/null || true
+    rm -f "${HOME}/.config/systemd/user/hyprcaffeine.service"
+    systemctl --user daemon-reload 2>/dev/null || true
+
+    rm -rf "${HOME}/.cache/hyprcaffeine"
+    echo "  State cache removed"
+
+    if [[ -d "${HOME}/.config/hyprcaffeine" ]]; then
+        echo -n "  Remove config at ~/.config/hyprcaffeine/? [y/N] "
+        read -r _uc_ans
+        if [[ "${_uc_ans:-}" =~ ^[Yy]$ ]]; then
+            rm -rf "${HOME}/.config/hyprcaffeine"
+            echo "  Config removed"
+        else
+            echo "  Config preserved"
+        fi
+    fi
+
+    if [[ -f "/etc/polkit-1/rules.d/50-hyprcaffeine.rules" ]]; then
+        echo -n "  Remove polkit rule? (requires sudo) [y/N] "
+        read -r _pol_ans
+        if [[ "${_pol_ans:-}" =~ ^[Yy]$ ]]; then
+            do_polkit_remove
+        fi
+    fi
+
+    if [[ "${install_mode}" == "system" ]]; then
+        echo -n "  Remove system binary and data? (requires sudo) [y/N] "
+        read -r _sys_ans
+        if [[ "${_sys_ans:-}" =~ ^[Yy]$ ]]; then
+            sudo rm -f "/usr/local/bin/hyprcaffeine"
+            sudo rm -rf "/usr/local/share/hyprcaffeine"
+            echo "  System files removed"
+        fi
+    elif [[ "${install_mode}" == "user" ]]; then
+        echo -n "  Remove user binary and data? [y/N] "
+        read -r _usr_ans
+        if [[ "${_usr_ans:-}" =~ ^[Yy]$ ]]; then
+            rm -f "${HOME}/.local/bin/hyprcaffeine"
+            rm -rf "${HOME}/.local/share/hyprcaffeine"
+            echo "  User files removed"
+        fi
+    fi
+
+    echo ""
+    echo "  Uninstall complete."
+    [[ "${install_mode}" == "aur" ]] && echo "  Run 'yay -R hyprcaffeine' to remove the AUR package."
+}
+
 # ── Main Entry Point ─────────────────────────────────────────────────────────
 
 main() {
@@ -589,6 +806,21 @@ main() {
                 status)  _kb_status ;;
                 *)       echo "Usage: hyprcaffeine keybinds <install|remove|status>" >&2; exit 1 ;;
             esac
+            ;;
+        polkit)
+            local pol_action="${1:-status}"
+            case "${pol_action}" in
+                install) do_polkit_install ;;
+                remove)  do_polkit_remove ;;
+                status)  do_polkit_status ;;
+                *)       echo "Usage: hyprcaffeine polkit <install|remove|status>" >&2; exit 1 ;;
+            esac
+            ;;
+        setup|reinstall)
+            do_setup
+            ;;
+        uninstall)
+            do_uninstall_self
             ;;
         restore)
             do_restore
