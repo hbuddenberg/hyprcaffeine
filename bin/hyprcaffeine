@@ -18,7 +18,7 @@ else
 fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="0.8.1"
+readonly VERSION="0.8.2"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -604,8 +604,18 @@ _setup_systemd_service() {
     done
     [[ -z "${src_service}" ]] && return 1
 
+    local self bin_path
+    self=$(command -v hyprcaffeine 2>/dev/null || true)
+    if [[ "${self}" == "${HOME}/.local/bin/hyprcaffeine" ]]; then
+        bin_path="%h/.local/bin/hyprcaffeine"
+    elif [[ -n "${self}" ]]; then
+        bin_path="${self}"
+    else
+        bin_path="%h/.local/bin/hyprcaffeine"
+    fi
+
     mkdir -p "${HOME}/.config/systemd/user"
-    cp "${src_service}" "${HOME}/.config/systemd/user/hyprcaffeine.service"
+    sed "s|__HC_BIN__|${bin_path}|g" "${src_service}" > "${HOME}/.config/systemd/user/hyprcaffeine.service"
     systemctl --user daemon-reload 2>/dev/null
     systemctl --user disable hyprcaffeine.service 2>/dev/null
     systemctl --user enable hyprcaffeine.service 2>/dev/null
@@ -616,15 +626,11 @@ do_setup() {
     echo ""
 
     echo "  [1/4] Polkit rule (sleep/lid inhibition)..."
-    if [[ -f "/etc/polkit-1/rules.d/50-hyprcaffeine.rules" ]]; then
-        echo "        ✅ Already installed"
+    echo "        Always reinstalling (ensures correct rules)..."
+    if do_polkit_install; then
+        echo "        ✅ Polkit installed"
     else
-        echo "        Not found — attempting install..."
-        if do_polkit_install; then
-            echo "        ✅ Polkit installed"
-        else
-            echo "        ⚠️  Skipped — run: sudo hyprcaffeine polkit install"
-        fi
+        echo "        ⚠️  Skipped — run: sudo hyprcaffeine polkit install"
     fi
 
     echo "  [2/4] Waybar integration..."

@@ -6,8 +6,8 @@ Type=oneshot
 # restore waits internally for the Hyprland socket (up to 60 s) before
 # creating inhibitors, so set a generous timeout here.
 TimeoutStartSec=120
-ExecStart=%h/.local/bin/hyprcaffeine restore
-ExecStart=-%h/.local/bin/hyprcaffeine watcher start
+ExecStart=__HC_BIN__ restore
+ExecStart=-__HC_BIN__ watcher start
 RemainAfterExit=yes
 
 [Install]

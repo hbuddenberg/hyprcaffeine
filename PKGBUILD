@@ -1,6 +1,6 @@
 # Maintainer: Hans-Dieter Buddenberg <hbuddenberg@gmail.com>
 pkgname=hyprcaffeine
-pkgver=0.8.1
+pkgver=0.8.2
 pkgrel=1
 pkgdesc='☕ Idle inhibition utility for Hyprland — caffeine for your Wayland compositor'
 arch=(any)
@@ -21,6 +21,9 @@ prepare() {
 
     # Patch LIB_DIR in the binary to use the installed data path
     sed -i "s|LIB_DIR=\"\${SCRIPT_DIR}/../scripts\"|LIB_DIR=\"/usr/share/hyprcaffeine/scripts\"|" bin/hyprcaffeine
+
+    # Patch service ExecStart to use the AUR binary path
+    sed -i 's|__HC_BIN__|/usr/bin/hyprcaffeine|g' systemd/hyprcaffeine.service
 }
 
 package() {

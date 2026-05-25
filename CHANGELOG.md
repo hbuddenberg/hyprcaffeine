@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.8.2] — 2026-05-26
+
+### Fixes
+
+- **Setup (polkit)**: `do_setup()` now always reinstalls the polkit rule instead of skipping when the file already exists. Previously, if the rule was present (even with stale/incorrect content), setup would report "Already installed" and skip — potentially leaving broken sleep/lid inhibition. The rule is now unconditionally overwritten on every `hyprcaffeine setup` and `post_upgrade` run.
+
+---
+
 ## [0.8.0-3] — 2026-05-25
 
 ### Fixes

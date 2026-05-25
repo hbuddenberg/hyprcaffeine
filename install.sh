@@ -642,8 +642,15 @@ install_systemd_service() {
         return
     fi
 
+    local bin_path
+    if [[ "${INSTALL_MODE}" == "system" ]]; then
+        bin_path="${BIN_DIR}/hyprcaffeine"
+    else
+        bin_path="%h/.local/bin/hyprcaffeine"
+    fi
+
     mkdir -p "${dst_dir}"
-    cp "${src_service}" "${dst_service}"
+    sed "s|__HC_BIN__|${bin_path}|g" "${src_service}" > "${dst_service}"
 
     systemctl --user daemon-reload 2>/dev/null || true
 
