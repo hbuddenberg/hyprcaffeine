@@ -332,39 +332,41 @@ do_restore() {
     lid="$(state_get_lid)"
     duration="$(state_get_duration)"
 
-    # Skip if nothing to restore
+    # Short-circuit before the socket wait when there is truly nothing to restore
     if [[ "${state}" != "active" && "${monitor}" != "true" && "${lid}" != "true" ]]; then
         return 0
     fi
 
-    # Restore monitor keep-awake
+    # Wait for Hyprland IPC socket before restoring inhibitors so that the
+    # service runs after Hyprland is up on non-UWSM systems (where
+    # graphical-session.target is never activated and the service fires before
+    # Hyprland). Gives up after 60 s and proceeds anyway.
+    local i=0 _xrt="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" _f
+    while (( i++ < 60 )); do
+        for _f in "${_xrt}/hypr"/*/.socket2.sock /tmp/hypr/*/.socket2.sock; do
+            [[ -S "${_f}" ]] && break 2
+        done
+        sleep 1
+    done
+
+    # Restore monitor keep-awake (persistent)
     if [[ "${monitor}" == "true" ]]; then
         hypr_monitor_on 2>/dev/null && restored+=("monitor")
     fi
 
-    # Restore lid inhibit
+    # Restore lid inhibit (persistent)
     if [[ "${lid}" == "true" ]]; then
         lid_inhibit_start 2>/dev/null && restored+=("lid")
     fi
 
-    # Restore idle inhibition (infinite always; finite timers check remaining)
+    # Restore idle inhibition — only infinite mode is persistent across reboots.
+    # Finite timers are ephemeral: clear the stale active state so it does not
+    # confuse the UI on next login.
     if [[ "${state}" == "active" ]]; then
         if [[ "${duration}" -eq 0 ]]; then
-            # Infinite mode — always restore
             hypr_idle_inhibit_on 2>/dev/null && restored+=("infinite")
         else
-            # Finite timer — restore only if time remaining
-            local remaining
-            remaining="$(state_get_remaining)"
-            if [[ "${remaining}" != "expired" && "${remaining}" != "unknown" ]]; then
-                local remain_seconds
-                remain_seconds="$(timer_to_seconds "${remaining}" 2>/dev/null)"
-                if [[ -n "${remain_seconds}" && "${remain_seconds}" -gt 0 ]]; then
-                    hypr_idle_inhibit_on 2>/dev/null
-                    timer_start "${remain_seconds}"
-                    restored+=("timer ${remaining}")
-                fi
-            fi
+            state_save "inactive" "0" "" "${monitor}" "${lid}"
         fi
     fi
 

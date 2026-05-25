@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.8.0-3] — 2026-05-25
+
+### Fixes
+
+- **Restore (boot)**: `do_restore` now waits up to 60 s for the Hyprland IPC socket before creating inhibitors. On non-UWSM systems `default.target` fires before Hyprland starts; the wait guarantees inhibitors are registered into an active session.
+- **Restore (boot)**: Finite timers are no longer restored on reboot — they are ephemeral and non-persistent. The stale `active` state is cleared to `inactive` so the UI starts clean. Only monitor keep-awake, lid-close inhibit, and infinite idle mode are restored.
+- **Systemd service**: Add `TimeoutStartSec=120` to accommodate the 60 s socket-wait inside `restore`.
+
+---
+
 ## [0.8.0] — 2026-05-22
 
 ### Fixes

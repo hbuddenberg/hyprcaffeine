@@ -3,11 +3,10 @@ Description=HyprCaffeine — restore inhibitors on user-session start
 
 [Service]
 Type=oneshot
+# restore waits internally for the Hyprland socket (up to 60 s) before
+# creating inhibitors, so set a generous timeout here.
+TimeoutStartSec=120
 ExecStart=%h/.local/bin/hyprcaffeine restore
-# "-" prefix: tolerate failure. The watcher needs Hyprland's IPC socket which
-# may not exist yet when this fires at user-session start (race with Hyprland
-# launch). Failing this step would cause systemd to kill the cgroup, wiping the
-# inhibitors that "restore" just created.
 ExecStart=-%h/.local/bin/hyprcaffeine watcher start
 RemainAfterExit=yes
 
