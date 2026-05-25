@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.8.3] — 2026-05-25
+
+### Fixes
+
+- **Setup (polkit)**: `do_setup()` now verifies polkit rule content before attempting reinstall. Previously it tried `sudo` unconditionally which failed in `runuser` context (no TTY). Now checks if the rule file exists AND contains valid inhibit action IDs — only reinstalls if missing or invalid.
+
+---
+
 ## [0.8.2] — 2026-05-26
 
 ### Fixes
