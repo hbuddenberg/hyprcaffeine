@@ -18,7 +18,7 @@ else
 fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="0.8.3"
+readonly VERSION="0.8.4"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -626,16 +626,20 @@ do_setup() {
     echo ""
 
     echo "  [1/4] Polkit rule (sleep/lid inhibition)..."
-    local _polkit_rule="/etc/polkit-1/rules.d/50-hyprcaffeine.rules"
-    if [[ -f "${_polkit_rule}" ]] && grep -q "inhibit-block-sleep\|inhibit-handle-lid-switch\|inhibit-delay-sleep" "${_polkit_rule}" 2>/dev/null; then
-        echo "        ✅ Already installed and valid"
-    else
-        echo "        Not found or outdated — reinstalling..."
+    if [[ "$(id -u)" -eq 0 ]]; then
+        # Running as root (post_install) — always (re)install
+        echo "        Installing as root..."
         if do_polkit_install; then
             echo "        ✅ Polkit installed"
         else
-            echo "        ⚠️  Failed — run: sudo hyprcaffeine polkit install"
+            echo "        ⚠️  Polkit install failed"
         fi
+    else
+        # /etc/polkit-1/rules.d/ is 0750 root:polkitd — unreadable by normal users.
+        # Cannot verify; the package post-install hook installs as root.
+        # If missing, user can fix manually.
+        echo "        ℹ️  Managed by root (package hook). If missing:"
+        echo "           sudo hyprcaffeine polkit install"
     fi
 
     echo "  [2/4] Waybar integration..."
