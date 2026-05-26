@@ -529,18 +529,26 @@ do_waybar_engine() {
 
 do_polkit_status() {
     local rule="/etc/polkit-1/rules.d/50-hyprcaffeine.rules"
-    if [[ -f "${rule}" ]]; then
+    # /etc/polkit-1/rules.d/ is 0750 root:polkitd — stat/read requires root.
+    # Use sudo -n (non-interactive) so interactive runs work; skip gracefully if not.
+    local _exists=false
+    if [[ "$(id -u)" -eq 0 ]]; then
+        [[ -f "${rule}" ]] && _exists=true
+    elif sudo -n test -f "${rule}" 2>/dev/null; then
+        _exists=true
+    fi
+
+    if "${_exists}"; then
         echo "Polkit rule: installed"
         echo "  Path: ${rule}"
-        if grep -q "wheel" "${rule}" 2>/dev/null; then
-            echo "  Grant: wheel group members"
-        else
-            echo "  Grant: specific user"
-        fi
+        local _grant
+        _grant=$(sudo -n grep -o "wheel\|isInGroup" "${rule}" 2>/dev/null | head -1)
+        [[ "${_grant}" == "wheel" || "${_grant}" == "isInGroup" ]] && \
+            echo "  Grant: wheel group members" || echo "  Grant: specific user"
     else
-        echo "Polkit rule: NOT installed"
+        echo "Polkit rule: NOT installed (or unverifiable without root)"
         echo "  Sleep/lid inhibition requires auth prompts"
-        echo "  Fix: hyprcaffeine polkit install"
+        echo "  Fix: sudo hyprcaffeine polkit install"
     fi
 }
 
