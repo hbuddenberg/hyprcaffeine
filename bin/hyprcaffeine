@@ -582,13 +582,18 @@ do_polkit_install() {
 
 do_polkit_remove() {
     local rule="/etc/polkit-1/rules.d/50-hyprcaffeine.rules"
-    if [[ ! -f "${rule}" ]]; then
-        echo "Polkit rule not installed — nothing to remove"
-        return 0
-    fi
     if [[ "$(id -u)" -eq 0 ]]; then
+        if [[ ! -f "${rule}" ]]; then
+            echo "Polkit rule not installed — nothing to remove"
+            return 0
+        fi
         rm -f "${rule}"
     elif command -v sudo &>/dev/null; then
+        # /etc/polkit-1/rules.d/ is 0750 root:polkitd — use sudo -n to check
+        if ! sudo -n test -f "${rule}" 2>/dev/null; then
+            echo "Polkit rule not found (or unverifiable without root) — nothing to remove"
+            return 0
+        fi
         sudo rm -f "${rule}"
     else
         echo "Error: sudo required to remove polkit rule" >&2
