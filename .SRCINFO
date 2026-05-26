@@ -14,7 +14,7 @@ pkgbase = hyprcaffeine
 	optdepends = gum: interactive menu and styled prompts
 	optdepends = libnotify: desktop notifications
 	optdepends = walker: menu frontend
-	source = hyprcaffeine-0.8.4.tar.gz::https://github.com/hbuddenberg/hyprcaffeine/releases/download/v0.8.4/hyprcaffeine-0.8.4.tar.gz
-	sha256sums = fc279100fdbc81e31a8bd4b3afb177b92d574d9da2ceb192d656ee0de0f16847
+	source = hyprcaffeine-0.8.4.tar.gz::https://github.com/hbuddenberg/hyprcaffeine/releases/download/v0.8.4-2/hyprcaffeine-0.8.4.tar.gz
+	sha256sums = 0ae0aecb569c64365719a504f78431891f7ba5e98df6267bdb711b95a3a88221
 
 pkgname = hyprcaffeine

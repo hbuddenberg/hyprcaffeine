@@ -13,8 +13,8 @@ optdepends=(
     'walker: menu frontend'
 )
 install=hyprcaffeine.install
-source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v$pkgver/$pkgname-$pkgver.tar.gz")
-sha256sums=('fc279100fdbc81e31a8bd4b3afb177b92d574d9da2ceb192d656ee0de0f16847')
+source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v0.8.4-2/$pkgname-$pkgver.tar.gz")
+sha256sums=('0ae0aecb569c64365719a504f78431891f7ba5e98df6267bdb711b95a3a88221')
 
 prepare() {
     cd "$srcdir/$pkgname-$pkgver" || return
