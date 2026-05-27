@@ -202,7 +202,7 @@ The `hyprcaffeine waybar` command outputs JSON:
 |:---|:---|:---|
 | Left click | `hyprcaffeine toggle` | Toggle on/off with default timeout |
 | Right click | `hyprcaffeine off` | Turn off immediately |
-| Middle click | `hyprcaffeine menu` | Open the interactive gum menu |
+| Middle click | `hyprcaffeine menu` | Open the interactive menu (gum/wofi/rofi) |
 
 You can customize these in your Waybar config by changing the `on-click*` values.
 

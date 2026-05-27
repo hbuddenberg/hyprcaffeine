@@ -24,7 +24,7 @@ The project is primarily **Bash-based** with an optional premium **Rust TUI** da
   - `timer.sh` — Countdown timer and duration parsing
   - `keybinds.sh` — Hyprland keybinding installation/management
   - `notify.sh` — Desktop notifications (notify-send wrapper)
-  - `caffeine-menu.sh` — Interactive menu (gum/wofi)
+  - `caffeine-menu.sh` — Interactive menu (gum/wofi/rofi)
   - `waybar*.sh` — Waybar JSON output and auto-integration
   - `ui-engine.sh` — UI abstraction layer
 - **`src-tui/`** — Premium Rust TUI (ratatui + crossterm)

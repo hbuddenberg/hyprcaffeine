@@ -30,7 +30,7 @@ Each feature is **independent** — use them individually or combine them:
 - 🖥️ **Keep Display On** — blocks dim, DPMS, and screen lock (persists across reboots)
 - 💻 **Block Lid** — prevents lid-close suspend (persists across reboots)
 - 📊 **Waybar integration** — live status with countdown, tooltip, and Catppuccin Mocha CSS classes
-- 🎮 **Walker menu** — interactive launcher menu via Walker (or wofi fallback)
+- 🎮 **Walker menu** — interactive launcher menu via Walker (or wofi/rofi fallback)
 - ⏳ **Countdown timer** — live countdown with desktop notifications before expiry
 - 🔔 **Desktop notifications** — warned before caffeine runs out
 - 🔄 **systemd service** — auto-start with the watcher daemon
@@ -83,14 +83,14 @@ The installer checks dependencies, installs the binary to `~/.local/bin/`, scrip
 
 | Command | Description |
 |:---|:---|
-| `hyprcaffeine` | Open interactive Walker/wofi menu |
+| `hyprcaffeine` | Open interactive Walker/wofi/rofi menu |
 | `hyprcaffeine on [DURATION]` | Activate sleep inhibition (suspend blocker) |
 | `hyprcaffeine off` | Deactivate sleep inhibition |
 | `hyprcaffeine off --all` | Deactivate **all** features (sleep + monitor + lid) |
 | `hyprcaffeine status` | Show current inhibition state |
 | `hyprcaffeine toggle` | Toggle sleep inhibition on/off |
 | `hyprcaffeine waybar` | Output Waybar-compatible JSON status |
-| `hyprcaffeine menu` | Open Walker/wofi launcher menu |
+| `hyprcaffeine menu` | Open Walker/wofi/rofi launcher menu |
 | `hyprcaffeine monitor on\|off\|toggle` | Keep Display On — blocks dim + DPMS + lock |
 | `hyprcaffeine lid on\|off\|toggle` | Block lid-close suspend |
 | `hyprcaffeine watcher start\|stop\|status` | Auto-activate daemon |

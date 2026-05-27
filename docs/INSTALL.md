@@ -11,12 +11,14 @@ HyprCaffeine requires the following dependencies:
 | `hyprctl` | Hyprland IPC / idle control | ✅ |
 | `notify-send` | Desktop notifications | ✅ |
 | `gum` | Interactive TUI menus | Recommended |
+| `wofi` | Wayland dmenu-style menus (wofi) | Recommended |
+| `rofi` | dmenu-style menus for X11/Wayland | Recommended |
 
 ### Installing Dependencies
 
 **Arch Linux:**
 ```bash
-sudo pacman -S bash jq hyprland gum libnotify
+sudo pacman -S bash jq hyprland gum rofi wofi libnotify
 ```
 
 **With an AUR helper (gum from AUR if not in repos):**
@@ -153,7 +155,7 @@ hyprctl version
 ```
 
 ### Gum menus don't appear
-Install `gum` or use non-interactive commands:
+Install `gum`, `wofi`, or `rofi` (any supported interactive menu) or use non-interactive commands:
 ```bash
 hyprcaffeine on 1800   # works without gum
 ```
