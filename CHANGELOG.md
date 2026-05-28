@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.8.5] — 2026-05-29
+
+### Added
+
+- **Interactive menus**: Add `rofi` as a supported fallback for interactive menus (selection and custom-duration input). `wofi` remains supported on Wayland; `gum` is still used for TUI-style menus.
+
+---
+
 ## [0.8.4] — 2026-05-26
 
 ### Fixes
