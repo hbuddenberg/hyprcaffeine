@@ -52,7 +52,7 @@ Controls the appearance of TUI menus and notifications.
 | Key | Type | Default | Description |
 |:---|:---|:---|:---|
 | `accent` | string | `"#89b4fa"` | Accent color (hex) for highlights and active states |
-| `border` | string | `"rounded"` | Border style for gum menus: `none`, `single`, `double`, `rounded`, `thick` |
+| `border` | string | `"rounded"` | Border style for gum menus: `none`, `single`, `double`, `rounded`, `thick` (ignored by `wofi`/`rofi`) |
 | `style` | string | `"catppuccin"` | Color palette preset (for future theming support) |
 
 ### Example

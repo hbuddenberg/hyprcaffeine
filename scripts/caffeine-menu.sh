@@ -48,6 +48,8 @@ if command -v walker &>/dev/null; then
     _choice=$(echo -e "${MENU_TEXT}" | walker -d -N -H --placeholder="☕ Caffeine" --maxheight=700 --width=330 2>/dev/null)
 elif command -v wofi &>/dev/null; then
     _choice=$(echo -e "${MENU_TEXT}" | wofi -d -p "☕ Caffeine" -W 320 -H 320 --cache-file=/dev/null 2>/dev/null)
+elif command -v rofi &>/dev/null; then
+    _choice=$(echo -e "${MENU_TEXT}" | rofi -dmenu -p "☕ Caffeine" -i -l 10 2>/dev/null)
 elif command -v gum &>/dev/null; then
     _choice=$(gum choose --header="☕ Caffeine" --header.border="rounded" --cursor="→ " --height=10 "${MENU_ITEMS[@]}" 2>/dev/null)
 fi
@@ -63,6 +65,8 @@ case "${_choice}" in
             _custom_duration=$(walker -d -I --placeholder="Duration (1:30 or 45m)" 2>/dev/null)
         elif command -v wofi &>/dev/null; then
             _custom_duration=$(wofi -d -p "Duration (1:30 or 45m)" --cache-file=/dev/null 2>/dev/null)
+        elif command -v rofi &>/dev/null; then
+            _custom_duration=$(rofi -dmenu -p "Duration (1:30 or 45m)" 2>/dev/null)
         elif command -v gum &>/dev/null; then
             _custom_duration=$(gum input --placeholder="Duration (1:30 or 45m)" 2>/dev/null)
         fi

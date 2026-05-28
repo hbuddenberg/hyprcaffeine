@@ -254,6 +254,20 @@ assert_ok "PKGBUILD exists" test -f "$PKGBUILD"
 assert_file_contains "PKGBUILD has pkgver" "$PKGBUILD" "pkgver="
 assert_file_contains "PKGBUILD has socat dep" "$PKGBUILD" "socat"
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo ""
+echo -e "${C_YELLOW}── docs & scripts mention rofi ──${C_RESET}"
+
+README_FILE="${SCRIPT_DIR}/README.md"
+CLAUDE_FILE="${SCRIPT_DIR}/CLAUDE.md"
+assert_file_contains "README mentions rofi" "$README_FILE" "rofi"
+assert_file_contains "CLAUDE mentions rofi" "$CLAUDE_FILE" "rofi"
+
+SCRIPT_CM="${SCRIPT_DIR}/scripts/caffeine-menu.sh"
+SCRIPT_UI="${SCRIPT_DIR}/scripts/ui-engine.sh"
+assert_file_contains "caffeine-menu.sh references rofi" "$SCRIPT_CM" "command -v rofi"
+assert_file_contains "ui-engine.sh references rofi" "$SCRIPT_UI" "command -v rofi"
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Summary
 echo ""

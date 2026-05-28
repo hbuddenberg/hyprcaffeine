@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Setup (polkit)**: `do_setup()` no longer attempts to read or verify the polkit rule file from user context. `/etc/polkit-1/rules.d/` is `0750 root:polkitd` — non-root users cannot stat files inside it, so `-f` always returned false, causing a spurious "Not found or outdated → reinstalling" path that then failed with `sudo` requiring a TTY. The user-context branch now skips validation entirely and prints guidance to run `sudo hyprcaffeine polkit install` if needed.
 
+### Added
+
+- **Interactive menus**: Add `rofi` as a supported fallback for interactive menus (selection and custom-duration input). `wofi` remains supported on Wayland; `gum` is still used for TUI-style menus.
+
 ---
 
 ## [0.8.3] — 2026-05-25
