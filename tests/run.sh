@@ -79,6 +79,10 @@ source "${LIB_DIR}/notify.sh"
 # Source timer_human from timer.sh (only that function)
 source "${LIB_DIR}/timer.sh"
 
+# Source keybinds.sh for the Lua/hyprlang detection tests (#4). Its entry-point
+# guard skips dispatch when sourced, so this only defines the _kb_* functions.
+source "${LIB_DIR}/keybinds.sh"
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 echo -e "${C_YELLOW}── parse_duration ──${C_RESET}"
 
@@ -208,6 +212,27 @@ assert_ok "presets has items" test "${#presets[@]}" -gt 0
 assert_eq "first preset = 900" "900" "${presets[0]}"
 assert_eq "second preset = 1800" "1800" "${presets[1]}"
 
+# preset_label / preset_arg — format configured presets for the Bash menu (#6)
+assert_eq "preset_label 900 → 15 min" "15 min" "$(preset_label 900)"
+assert_eq "preset_label 1800 → 30 min" "30 min" "$(preset_label 1800)"
+assert_eq "preset_label 3600 → 1 hour" "1 hour" "$(preset_label 3600)"
+assert_eq "preset_label 7200 → 2 hours" "2 hours" "$(preset_label 7200)"
+assert_eq "preset_label 65 → 65 sec" "65 sec" "$(preset_label 65)"
+# preset_arg must NEVER emit bare seconds — parse_duration treats a bare int as MINUTES
+assert_eq "preset_arg 900 → 15m (not 900!)" "15m" "$(preset_arg 900)"
+assert_eq "preset_arg 3600 → 1h" "1h" "$(preset_arg 3600)"
+assert_eq "preset_arg 7200 → 2h" "2h" "$(preset_arg 7200)"
+assert_eq "preset_arg 65 → 65s" "65s" "$(preset_arg 65)"
+
+# Reporter scenario (#6): a user config that drops the 900 preset must drop "15 min"
+_HC_REPORTER_CFG="${TEST_STATE_DIR}/reporter.yaml"
+printf 'timeouts:\n  presets:\n    - 1800\n    - 3600\n    - 7200\n' > "${_HC_REPORTER_CFG}"
+HYPRCAFFEINE_CONFIG_FILE="${_HC_REPORTER_CFG}" config_reload
+mapfile -t _rep < <(config_get_array "timeouts.presets")
+assert_eq "reporter presets = 1800 3600 7200 (900 dropped)" "1800 3600 7200" "${_rep[*]}"
+rm -f "${_HC_REPORTER_CFG}"
+config_reload  # restore default cache for any later reads
+
 # Test missing key
 missing=$(config_get "nonexistent.key")
 assert_eq "missing key → empty" "" "$missing"
@@ -216,6 +241,51 @@ assert_eq "missing key → empty" "" "$missing"
 config_set_runtime "theme.accent" "#ff0000"
 new_accent=$(config_get "theme.accent")
 assert_eq "runtime override accent" "#ff0000" "$new_accent"
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo ""
+echo -e "${C_YELLOW}── menu render (#5: no trailing blank option) ──${C_RESET}"
+
+_count_empty() { awk '/^$/{c++} END{print c+0}'; }
+
+# The menu renders items with `printf '%s\n' "${arr[@]}"`. That must emit exactly
+# N lines with NO trailing empty line — a trailing empty line becomes a blank,
+# selectable dmenu option (the bug in #5).
+_HC_ITEMS=("󰔛 15 min" "󰔛 30 min" "󰔛 1 hour" "󰔛 Infinite" "────" "󰍹 Display" "󰌢 Lid")
+assert_eq "render: total lines == items" "${#_HC_ITEMS[@]}" "$(printf '%s\n' "${_HC_ITEMS[@]}" | wc -l)"
+assert_eq "render: 0 empty lines (no blank option)" "0" "$(printf '%s\n' "${_HC_ITEMS[@]}" | _count_empty)"
+assert_eq "single item: 0 empty lines" "0" "$(printf '%s\n' "solo" | _count_empty)"
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo ""
+echo -e "${C_YELLOW}── keybinds detection (#4: by config file, not version) ──${C_RESET}"
+
+# _kb_get_paths reads the _KB_HYPRLAND_DIR global at call time, so override it
+# per scenario to simulate each config-file state. The decision must NOT depend
+# on the Hyprland version: a hyprland.conf user on Hyprland ≥0.55 must stay on
+# the hyprlang path (the bug in #4).
+_KD="$(mktemp -d)"
+
+: > "$_KD/hyprland.conf"
+_KB_HYPRLAND_DIR="$_KD"; _kb_get_paths
+assert_eq "only hyprland.conf → hyprlang" "hyprlang" "${FORMAT}"
+assert_eq "  → writes .conf" "hyprcaffeine-keybinds.conf" "$(basename "${KEYBINDS_FILE}")"
+
+: > "$_KD/hyprland.lua"
+_KB_HYPRLAND_DIR="$_KD"; _kb_get_paths
+assert_eq "hyprland.lua added → lua" "lua" "${FORMAT}"
+assert_eq "  → writes .lua" "hyprcaffeine-keybinds.lua" "$(basename "${KEYBINDS_FILE}")"
+
+rm -f "$_KD/hyprland.conf"
+_KB_HYPRLAND_DIR="$_KD"; _kb_get_paths
+assert_eq "only hyprland.lua → lua" "lua" "${FORMAT}"
+
+rm -f "$_KD/hyprland.lua"
+_KB_HYPRLAND_DIR="$_KD"; _kb_get_paths
+assert_eq "no config file → hyprlang (safe default)" "hyprlang" "${FORMAT}"
+
+rm -rf "$_KD"
+_KB_HYPRLAND_DIR="${HOME}/.config/hypr"
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 echo ""

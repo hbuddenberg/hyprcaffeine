@@ -5,6 +5,11 @@
 UI_DICT="${UI_DICT:-$(dirname "${BASH_SOURCE[0]}")/../config/ui-dictionary.json}"
 STATE_FILE="${HOME}/.cache/hyprcaffeine/state.json"
 
+# Resolve lib dir so we can read the user's duration presets from config.
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=config.sh
+source "${LIB_DIR}/config.sh"
+
 # ── State readers ──────────────────────────────────────────────────────────
 _sf() { sed -n "s/.*\"${1}\"[[:space:]]*:[[:space:]]*\"\{0,1\}\([^\"]*\)\"\{0,1\}.*/\1/p" "${STATE_FILE}" 2>/dev/null | head -1; }
 _sb() { sed -n "s/.*\"${1}\"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p" "${STATE_FILE}" 2>/dev/null | head -1; }
@@ -182,19 +187,20 @@ walker_menu() {
     [[ "${monitor}" == "true" ]] && mon_ind="●"
     [[ "${lid}" == "true" ]] && lid_ind="●"
 
-    # Read presets
-    local p15 p30 p1h p2h
-    p15="$(_jpath 'presets.15m.label')"
-    p30="$(_jpath 'presets.30m.label')"
-    p1h="$(_jpath 'presets.1h.label')"
-    p2h="$(_jpath 'presets.2h.label')"
+    # Read duration presets from the user config (falls back to defaults).
+    mapfile -t _PRESET_SECS < <(config_get_array "timeouts.presets")
+    [[ "${#_PRESET_SECS[@]}" -eq 0 ]] && _PRESET_SECS=(900 1800 3600 7200)
 
     # Build items
-    MENU_ITEMS=(
-        "${icon_timer} ${p15}"
-        "${icon_timer} ${p30}"
-        "${icon_timer} ${p1h}"
-        "${icon_timer} ${p2h}"
+    _PRESET_LABELS=()
+    MENU_ITEMS=()
+    local _label
+    for _sec in "${_PRESET_SECS[@]}"; do
+        _label="$(preset_label "${_sec}")"
+        _PRESET_LABELS+=("${_label}")
+        MENU_ITEMS+=("${icon_timer} ${_label}")
+    done
+    MENU_ITEMS+=(
         "${icon_timer} Custom..."
         "${icon_infinite} Infinite"
         "────────────────────────"
@@ -209,19 +215,14 @@ walker_menu() {
         MENU_ITEMS+=("󰾪 Turn Off (${remaining:-active})")
     fi
 
-    MENU_TEXT=""
-    for item in "${MENU_ITEMS[@]}"; do
-        MENU_TEXT="${MENU_TEXT}${item}\\n"
-    done
-    MENU_TEXT="${MENU_TEXT%\\\\n}"
-
+    # printf '%s\n' avoids the trailing empty line that produced a blank dmenu option
     _choice=""
     if command -v walker &>/dev/null; then
-        _choice=$(echo -e "${MENU_TEXT}" | walker -d -N -H --placeholder="☕ Caffeine" --maxheight=700 --width=330 2>/dev/null)
+        _choice=$(printf '%s\n' "${MENU_ITEMS[@]}" | walker -d -N -H --placeholder="☕ Caffeine" --maxheight=700 --width=330 2>/dev/null)
     elif command -v wofi &>/dev/null; then
-        _choice=$(echo -e "${MENU_TEXT}" | wofi -d -p "☕ Caffeine" -W 320 -H 320 --cache-file=/dev/null 2>/dev/null)
+        _choice=$(printf '%s\n' "${MENU_ITEMS[@]}" | wofi -d -p "☕ Caffeine" -W 320 -H 320 --cache-file=/dev/null 2>/dev/null)
     elif command -v rofi &>/dev/null; then
-        _choice=$(echo -e "${MENU_TEXT}" | rofi -dmenu -p "☕ Caffeine" -i -lines 10 2>/dev/null)
+        _choice=$(printf '%s\n' "${MENU_ITEMS[@]}" | rofi -dmenu -p "☕ Caffeine" -i -lines 10 2>/dev/null)
     fi
 
     [[ -z "${_choice}" ]] && exit 0
@@ -239,16 +240,21 @@ walker_menu() {
             [[ -z "${_custom_duration}" ]] && exit 0
             hyprcaffeine on "${_custom_duration}"
             ;;
-        *15*min*)   hyprcaffeine on 15m ;;
-        *30*min*)   hyprcaffeine on 30m ;;
-        *1*hour*)   hyprcaffeine on 1h ;;
-        *2*hour*)   hyprcaffeine on 2h ;;
         *Infinite*|*infinite*) hyprcaffeine on infinite ;;
         *Display*|*display*)   hyprcaffeine monitor toggle ;;
         *Lid*|*lid*)           hyprcaffeine lid toggle ;;
         *Turn*Off*|*turn*off*) hyprcaffeine off ;;
         *────*) exit 0 ;;
     esac
+
+    # Dynamic preset match — labels/seconds come from the user config.
+    local _i
+    for _i in "${!_PRESET_LABELS[@]}"; do
+        if [[ "${_choice}" == *"${_PRESET_LABELS[$_i]}"* ]]; then
+            hyprcaffeine on "$(preset_arg "${_PRESET_SECS[$_i]}")"
+            exit 0
+        fi
+    done
 }
 
 # ── CLI entry ──────────────────────────────────────────────────────────────

@@ -5,6 +5,11 @@
 HYPRCAFFEINE="hyprcaffeine"
 STATE_FILE="${HOME}/.cache/hyprcaffeine/state.json"
 
+# Resolve lib dir so we can read the user's duration presets from config.
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=config.sh
+source "${LIB_DIR}/config.sh"
+
 _get_field() {
     sed -n "s/.*\"${1}\"[[:space:]]*:[[:space:]]*\"\{0,1\}\([^\"]*\)\"\{0,1\}.*/\1/p" "${STATE_FILE}" 2>/dev/null | head -1
 }
@@ -18,11 +23,18 @@ if [[ "$(_get_bool monitor)" == "true" ]]; then MON="●"; else MON="○"; fi
 if [[ "$(_get_bool lid)" == "true" ]];     then LID="●"; else LID="○"; fi
 
 # Build items — verified Nerd Font icons
-MENU_ITEMS=(
-    "󰔛 15 min"
-    "󰔛 30 min"
-    "󰔛 1 hour"
-    "󰔛 2 hours"
+# Read duration presets from the user config (falls back to defaults).
+mapfile -t _PRESET_SECS < <(config_get_array "timeouts.presets")
+[[ "${#_PRESET_SECS[@]}" -eq 0 ]] && _PRESET_SECS=(900 1800 3600 7200)
+
+_PRESET_LABELS=()
+MENU_ITEMS=()
+for _sec in "${_PRESET_SECS[@]}"; do
+    _label="$(preset_label "${_sec}")"
+    _PRESET_LABELS+=("${_label}")
+    MENU_ITEMS+=("󰔛 ${_label}")
+done
+MENU_ITEMS+=(
     "󰔛 Custom..."
     " Infinite"
     "────────────────────────"
@@ -37,19 +49,16 @@ if _is_idle_active; then
     MENU_ITEMS+=("󰤆 Turn Off (${REMAINING:-active})")
 fi
 
-MENU_TEXT=""
-for item in "${MENU_ITEMS[@]}"; do
-    MENU_TEXT="${MENU_TEXT}${item}\\n"
-done
-MENU_TEXT="${MENU_TEXT%\\\\n}"
-
+# Render the menu. printf '%s\n' emits exactly one item per line with a single
+# trailing newline (no trailing empty line), so dmenu-style launchers
+# (walker/wofi/rofi) don't show a spurious blank option at the end of the list.
 _choice=""
 if command -v walker &>/dev/null; then
-    _choice=$(echo -e "${MENU_TEXT}" | walker -d -N -H --placeholder="☕ Caffeine" --maxheight=700 --width=330 2>/dev/null)
+    _choice=$(printf '%s\n' "${MENU_ITEMS[@]}" | walker -d -N -H --placeholder="☕ Caffeine" --maxheight=700 --width=330 2>/dev/null)
 elif command -v wofi &>/dev/null; then
-    _choice=$(echo -e "${MENU_TEXT}" | wofi -d -p "☕ Caffeine" -W 320 -H 320 --cache-file=/dev/null 2>/dev/null)
+    _choice=$(printf '%s\n' "${MENU_ITEMS[@]}" | wofi -d -p "☕ Caffeine" -W 320 -H 320 --cache-file=/dev/null 2>/dev/null)
 elif command -v rofi &>/dev/null; then
-    _choice=$(echo -e "${MENU_TEXT}" | rofi -dmenu -p "☕ Caffeine" -i -l 10 2>/dev/null)
+    _choice=$(printf '%s\n' "${MENU_ITEMS[@]}" | rofi -dmenu -p "☕ Caffeine" -i -l 10 2>/dev/null)
 elif command -v gum &>/dev/null; then
     _choice=$(gum choose --header="☕ Caffeine" --header.border="rounded" --cursor="→ " --height=10 "${MENU_ITEMS[@]}" 2>/dev/null)
 fi
@@ -73,13 +82,17 @@ case "${_choice}" in
         [[ -z "${_custom_duration}" ]] && exit 0
         "${HYPRCAFFEINE}" on "${_custom_duration}"
         ;;
-    *15*min*)   "${HYPRCAFFEINE}" on 15m ;;
-    *30*min*)   "${HYPRCAFFEINE}" on 30m ;;
-    *1*hour*)   "${HYPRCAFFEINE}" on 1h ;;
-    *2*hour*)   "${HYPRCAFFEINE}" on 2h ;;
     *Infinite*|*infinite*) "${HYPRCAFFEINE}" on infinite ;;
     *Display*|*display*)   "${HYPRCAFFEINE}" monitor toggle ;;
     *Lid*|*lid*)           "${HYPRCAFFEINE}" lid toggle ;;
     *Turn*Off*|*turn*off*) "${HYPRCAFFEINE}" off ;;
     *────*) exit 0 ;;  # Separator — do nothing
 esac
+
+# Dynamic preset match — labels/seconds come from the user config.
+for _i in "${!_PRESET_LABELS[@]}"; do
+    if [[ "${_choice}" == *"${_PRESET_LABELS[$_i]}"* ]]; then
+        "${HYPRCAFFEINE}" on "$(preset_arg "${_PRESET_SECS[$_i]}")"
+        exit 0
+    fi
+done

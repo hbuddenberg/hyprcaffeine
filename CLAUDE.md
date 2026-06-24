@@ -191,8 +191,10 @@ cat ~/.cache/hyprcaffeine/state.json
 
 ### Keybinding Auto-Install
 - `install.sh` calls `hyprcaffeine keybinds install` post-install
-- Keybindings are written to `~/.config/hypr/hyprcaffeine-keybinds.conf`
-- User must source this file in their `hyprland.conf`: `source = ~/.config/hypr/hyprcaffeine-keybinds.conf`
+- Format is chosen by which Hyprland config the user actually has on disk (NOT by Hyprland version — see issue #4):
+  - `hyprland.conf` present → writes `hyprcaffeine-keybinds.conf` (hyprlang `bind =` syntax) and appends `source = ~/.config/hypr/hyprcaffeine-keybinds.conf`
+  - `hyprland.lua` present → writes `hyprcaffeine-keybinds.lua` (Lua `hl.bind`/`hl.dsp.exec_cmd` API) and appends `require("hyprcaffeine-keybinds")`
+- The source/require line is appended at the END of the config so HyprCaffeine binds take priority
 - Defaults: `$mainMod CTRL I` (toggle infinite), `$mainMod CTRL+Shift I` (menu), etc.
 
 ### Polkit Rule Requirement

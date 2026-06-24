@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.9.0] — 2026-06-24
+
+### Fixes
+
+- **Config-driven menu presets (#6)**: The interactive menu now honors `timeouts.presets` from the user config instead of hardcoded durations. Removing or customizing a preset (e.g. the default 15 min) now takes effect in both `caffeine-menu.sh` and `ui-engine.sh`.
+- **No blank trailing menu option (#5)**: Menu rendering switched from `echo -e` to `printf '%s\n'`, removing the spurious blank option at the end of the list in walker/wofi/rofi (caused by a trailing empty line that the old strip pattern failed to remove).
+- **Lua keybind detection (#4)**: Keybind format is now chosen by which Hyprland config the user has on disk (`hyprland.lua` vs `hyprland.conf`), not by the Hyprland version. Fixes keybindings silently failing for `hyprland.conf` users on Hyprland ≥0.55, who were wrongly switched to the Lua path.
+- **Installer**: keybind-install stderr is no longer suppressed, so format/source errors surface instead of failing silently.
+
+---
+
 ## [0.8.5] — 2026-05-29
 
 ### Added

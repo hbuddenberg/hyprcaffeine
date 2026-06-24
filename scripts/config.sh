@@ -268,6 +268,36 @@ config_get_array() {
 }
 
 # =============================================================================
+# preset helpers — format timeout-preset seconds (from timeouts.presets).
+# Shared by the Bash menu (caffeine-menu.sh / ui-engine.sh) so both render the
+# user's configured presets identically.
+# =============================================================================
+
+# preset_label <seconds> -> human menu label.
+#   900 -> "15 min", 3600 -> "1 hour", 7200 -> "2 hours", 65 -> "65 sec"
+preset_label() {
+    local sec="$1"
+    if (( sec % 3600 == 0 )); then
+        local h=$(( sec / 3600 ))
+        (( h == 1 )) && echo "1 hour" || echo "${h} hours"
+    elif (( sec % 60 == 0 )); then
+        echo "$(( sec / 60 )) min"
+    else
+        echo "${sec} sec"
+    fi
+}
+
+# preset_arg <seconds> -> a single-unit duration token parse_duration accepts.
+#   IMPORTANT: parse_duration treats a BARE number as minutes, so we must never
+#   pass raw seconds. Always emit a single unit: Xh / Xm / Xs.
+preset_arg() {
+    local sec="$1"
+    if (( sec % 3600 == 0 )); then echo "$(( sec / 3600 ))h"
+    elif (( sec % 60 == 0 )); then echo "$(( sec / 60 ))m"
+    else echo "${sec}s"; fi
+}
+
+# =============================================================================
 # config_set_runtime <key> <value> — Override a config value in memory.
 #   Does not write to disk. Useful for CLI overrides.
 #   Handles dotted keys (e.g. "theme.accent") and top-level keys.

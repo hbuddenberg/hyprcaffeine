@@ -12,7 +12,11 @@
 
 set -uo pipefail
 
-# ── Hyprland Version Detection ────────────────────────────────────────────────
+# ── Hyprland Version Detection (informational only) ──────────────────────────
+# The version is shown in install/status output for diagnostics only. It does NOT
+# decide the config format anymore — format is chosen by which config the user
+# actually has on disk (see _kb_is_lua). Tracking version for the decision broke
+# users on Hyprland ≥0.55 who still use hyprland.conf (issue #4).
 
 # Returns: 0.54, 0.55, 0.56, etc. or "0.0" if not found
 _kb_get_version() {
@@ -28,25 +32,34 @@ _kb_get_version() {
     echo "${ver:-0.0}"
 }
 
-# Returns: true if Hyprland ≥ 0.55 (Lua config), false otherwise
+# ── Config Format Detection ───────────────────────────────────────────────────
+# Decide hyprlang vs Lua based on which config the user ACTUALLY has on disk,
+# NOT on the Hyprland version. A user on Hyprland ≥0.55 who still uses
+# hyprland.conf must NOT be forced onto the Lua path: that writes
+# hyprcaffeine-keybinds.lua plus a require() line into a hyprland.lua that
+# Hyprland never reads, so the keybinds silently fail to load (issue #4).
+#
+# Hyprland's Lua entry point is hyprland.lua (mirrors hyprland.conf); extra
+# modules are pulled in with require(), e.g. require("hyprcaffeine-keybinds").
+
+_KB_HYPRLAND_DIR="${HOME}/.config/hypr"
+
+# Returns: success (0) if the user has a Lua config (hyprland.lua), fail (1) otherwise.
 _kb_is_lua() {
-    local ver
-    ver="$(_kb_get_version)"
-    # Compare major.minor as a decimal
-    awk -v v="${ver}" 'BEGIN { split(v, a, "."); print (a[1] > 0 || a[2] >= 55) }'
+    [[ -f "${_KB_HYPRLAND_DIR}/hyprland.lua" ]]
 }
 
 # ── Determine Paths ───────────────────────────────────────────────────────────
 
 _kb_get_paths() {
-    if [[ "$(_kb_is_lua)" == "1" ]]; then
-        KEYBINDS_FILE="${HOME}/.config/hypr/hyprcaffeine-keybinds.lua"
-        HYPRLAND_CONF="${HOME}/.config/hypr/hyprland.lua"
+    if _kb_is_lua; then
+        KEYBINDS_FILE="${_KB_HYPRLAND_DIR}/hyprcaffeine-keybinds.lua"
+        HYPRLAND_CONF="${_KB_HYPRLAND_DIR}/hyprland.lua"
         SOURCE_LINE='require("hyprcaffeine-keybinds")'
         FORMAT="lua"
     else
-        KEYBINDS_FILE="${HOME}/.config/hypr/hyprcaffeine-keybinds.conf"
-        HYPRLAND_CONF="${HOME}/.config/hypr/hyprland.conf"
+        KEYBINDS_FILE="${_KB_HYPRLAND_DIR}/hyprcaffeine-keybinds.conf"
+        HYPRLAND_CONF="${_KB_HYPRLAND_DIR}/hyprland.conf"
         SOURCE_LINE="source = ~/.config/hypr/hyprcaffeine-keybinds.conf"
         FORMAT="hyprlang"
     fi
@@ -75,7 +88,7 @@ _kb_generate() {
 
     if [[ "${FORMAT}" == "lua" ]]; then
         cat << LUA
--- HyprCaffeine Keybinds (v0.7.4) ──────────────────────────────────────────
+-- HyprCaffeine Keybinds (v0.9.0) ──────────────────────────────────────────
 -- SUPER + CTRL + I       → Toggle infinite idle (on/off)
 -- SUPER + CTRL + SHIFT + I → Show Walker menu
 -- SUPER + CTRL + SHIFT + D → Toggle lid inhibit
@@ -88,7 +101,7 @@ hl.bind("SUPER + CTRL + D",         hl.dsp.exec_cmd("${hc_path} monitor toggle")
 LUA
     else
         cat << CONF
-# ── HyprCaffeine Keybinds (v0.7.4) ──────────────────────────────────────────
+# ── HyprCaffeine Keybinds (v0.9.0) ──────────────────────────────────────────
 # SUPER + CTRL + I       → Toggle infinite idle (on/off)
 # SUPER + CTRL + SHIFT + I → Show Walker menu
 # SUPER + CTRL + SHIFT + D → Toggle lid inhibit

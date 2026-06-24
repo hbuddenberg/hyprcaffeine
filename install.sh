@@ -623,7 +623,9 @@ do_install() {
 # ── Keybindings ──────────────────────────────────────────
 install_keybinds() {
     step "Installing Hyprland keybindings..."
-    if "${BIN_DIR}/hyprcaffeine" keybinds install 2>/dev/null; then
+    # Note: stderr is intentionally NOT suppressed — surfacing Lua/hyprlang format
+    # or source-line errors is more useful than hiding them (issue #4).
+    if "${BIN_DIR}/hyprcaffeine" keybinds install; then
         success "Keybindings installed"
     else
         warn "Could not install keybindings — run manually: hyprcaffeine keybinds install"
