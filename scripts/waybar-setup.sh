@@ -42,6 +42,11 @@ _in_modules_right() {
     _get_modules_right_block | grep -q '"custom/hyprcaffeine"' 2>/dev/null
 }
 
+# Check if module is positioned in ANY modules-* array (not in definition)
+_is_positioned() {
+    grep -qE '"custom/hyprcaffeine"[[:space:]]*([],]|$)' "$WB_CONFIG" 2>/dev/null
+}
+
 # Check if CSS is injected in style.css
 _has_css() {
     grep -q '#custom-hyprcaffeine' "$WB_STYLE" 2>/dev/null
@@ -182,8 +187,8 @@ main() {
     fi
 
     # ── Position ──
-    if _in_modules_right; then
-        _log "✅ Module already in modules-right"
+    if _is_positioned; then
+        _log "✅ Module already placed in a modules-* array"
     else
         _position_module
     fi
