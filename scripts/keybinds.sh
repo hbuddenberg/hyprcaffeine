@@ -88,7 +88,7 @@ _kb_generate() {
 
     if [[ "${FORMAT}" == "lua" ]]; then
         cat << LUA
--- HyprCaffeine Keybinds (v0.9.0) ──────────────────────────────────────────
+-- HyprCaffeine Keybinds (v0.9.1) ──────────────────────────────────────────
 -- SUPER + CTRL + I       → Toggle infinite idle (on/off)
 -- SUPER + CTRL + SHIFT + I → Show Walker menu
 -- SUPER + CTRL + SHIFT + D → Toggle lid inhibit
@@ -101,7 +101,7 @@ hl.bind("SUPER + CTRL + D",         hl.dsp.exec_cmd("${hc_path} monitor toggle")
 LUA
     else
         cat << CONF
-# ── HyprCaffeine Keybinds (v0.9.0) ──────────────────────────────────────────
+# ── HyprCaffeine Keybinds (v0.9.1) ──────────────────────────────────────────
 # SUPER + CTRL + I       → Toggle infinite idle (on/off)
 # SUPER + CTRL + SHIFT + I → Show Walker menu
 # SUPER + CTRL + SHIFT + D → Toggle lid inhibit

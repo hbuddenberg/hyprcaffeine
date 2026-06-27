@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.9.1] — 2026-06-27
+
+### Fixes
+
+- **Waybar auto-integration (#7)**: `waybar-setup` only checked `modules-right`, so a module placed in `modules-left` or `modules-center` was not detected and got duplicated into `modules-right` on every `hyprcaffeine setup` run (e.g. `post_upgrade`). It now detects the module as an array element in any `modules-*` array and skips positioning when already present. Thanks @Mahlski.
+
 ## [0.9.0] — 2026-06-24
 
 ### Fixes
