@@ -14,7 +14,7 @@ optdepends=(
 )
 install=hyprcaffeine.install
 source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v0.9.1/$pkgname-$pkgver.tar.gz")
-sha256sums=('8d75f9e467f56d0d4ee2a23adced7ee7657ab33a8e190e85e3c81ba14240a94f')
+sha256sums=('f3ddef6e025cc90cbfa24a346bc8a4524372901a4988c6f8ddf263d2f67c7d4c')
 
 prepare() {
     cd "$srcdir/$pkgname-$pkgver" || return
