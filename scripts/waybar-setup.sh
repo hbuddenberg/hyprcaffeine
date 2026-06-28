@@ -27,19 +27,9 @@ FORCE=false
 
 _log() { echo "  $1"; }
 
-# Extract modules-right block from config
-_get_modules_right_block() {
-    sed -n '/"modules-right"/,/]/p' "$WB_CONFIG" 2>/dev/null
-}
-
 # Check if module definition exists anywhere in config
 _has_definition() {
     grep -c '"custom/hyprcaffeine"' "$WB_CONFIG" 2>/dev/null | grep -qv '^0$'
-}
-
-# Check if module is positioned in modules-right array (not in definition)
-_in_modules_right() {
-    _get_modules_right_block | grep -q '"custom/hyprcaffeine"' 2>/dev/null
 }
 
 # Check if module is positioned in ANY modules-* array (not in definition)
@@ -55,10 +45,15 @@ _has_css() {
 # ── Remove ───────────────────────────────────────────────────────────────────
 
 _remove_all() {
-    # 1. Remove from modules-right array only (scoped to that block)
-    if _in_modules_right; then
-        sed -i '/"modules-right"/,/]/{/"custom\/hyprcaffeine",/d}' "$WB_CONFIG" 2>/dev/null
-        _log "✅ Removed from modules-right"
+    # 1. Remove the placement from ANY modules-* array (sibling-safe; never the ": {" def line).
+    if _is_positioned; then
+        sed -E -i \
+            -e '/^[[:space:]]*"custom\/hyprcaffeine"[[:space:]]*,?[[:space:]]*$/d' \
+            -e 's/"custom\/hyprcaffeine"[[:space:]]*,[[:space:]]*//g' \
+            -e 's/,[[:space:]]*"custom\/hyprcaffeine"//g' \
+            -e 's/\[[[:space:]]*"custom\/hyprcaffeine"[[:space:]]*\]/[]/g' \
+            "$WB_CONFIG" 2>/dev/null
+        _log "✅ Removed module placement"
     fi
 
     # 2. Remove module definition block — use python for reliable JSON-aware removal
