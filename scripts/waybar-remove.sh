@@ -54,14 +54,8 @@ if [[ "$_changed" == false ]]; then
     _log "ℹ️  No hyprcaffeine integration found in waybar"
 fi
 
-# Restart waybar if changed and running
+# Reload waybar if changed and running
 if [[ "$_changed" == true ]] && pgrep -x waybar &>/dev/null; then
-    _log "🔄 Restarting waybar..."
-    SIG="$(ls /run/user/1000/hypr/ 2>/dev/null | head -1)"
-    pkill -x waybar 2>/dev/null || true
-    sleep 0.5
-    if [[ -n "$SIG" ]]; then
-        HYPRLAND_INSTANCE_SIGNATURE="$SIG" WAYLAND_DISPLAY=wayland-1 \
-            XDG_RUNTIME_DIR="/run/user/$(id -u)" hyprctl dispatch exec waybar 2>/dev/null || true
-    fi
+    _log "🔄 Reloading waybar..."
+    pkill -SIGUSR2 -x waybar 2>/dev/null || true
 fi
