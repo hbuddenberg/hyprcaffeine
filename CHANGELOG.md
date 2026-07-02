@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.9.2] — 2026-07-02
+
+### Fixes
+
+- **Waybar removal array-agnostic (#10)**: `waybar-remove` (and `setup --force`) only scrubbed `modules-right`. A module placed in `modules-left` or `modules-center` was orphaned on uninstall — definition removed, placement left behind, resulting in a broken module reference. Removal now matches any `modules-*` array (sibling-safe sed), mirroring the array-agnostic detection introduced in #7. Drops the now-dead `_in_modules_right` / `_get_modules_right_block` helpers. Thanks @Mahlski.
+- **Waybar reload via SIGUSR2 (#11)**: `_restart_waybar` used `pkill -x waybar` + `sleep 0.5` + `hyprctl dispatch exec waybar`. On Lua-config Hyprland, `hyprctl dispatch` is blocked — waybar was killed but never relaunched, leaving the bar dead until a manual restart. Replaced with `pkill -SIGUSR2 -x waybar` (waybar's documented in-place reload signal). PID stays intact, no hardcoded UID/`WAYLAND_DISPLAY`/instance-signature assumptions, both scripts shellcheck-clean. Thanks @Mahlski.
+
 ## [0.9.1] — 2026-06-27
 
 ### Fixes
