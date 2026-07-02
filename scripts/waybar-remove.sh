@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # HyprCaffeine — Waybar Remove
-# Removes all waybar integration: definition, modules-right entry, CSS
+# Removes all waybar integration: definition, modules-* placement, CSS
 # Usage: waybar-remove.sh
 # =============================================================================
 
@@ -19,10 +19,15 @@ fi
 
 _changed=false
 
-# 1. Remove from modules-right array (scoped to that block)
-if sed -n '/"modules-right"/,/]/p' "$WB_CONFIG" 2>/dev/null | grep -q '"custom/hyprcaffeine"'; then
-    sed -i '/"modules-right"/,/]/{/"custom\/hyprcaffeine",/d}' "$WB_CONFIG" 2>/dev/null
-    _log "✅ Removed from modules-right"
+# 1. Remove the placement from ANY modules-* array (sibling-safe; never the ": {" def line).
+if grep -qE '"custom/hyprcaffeine"[[:space:]]*([],]|$)' "$WB_CONFIG" 2>/dev/null; then
+    sed -E -i \
+        -e '/^[[:space:]]*"custom\/hyprcaffeine"[[:space:]]*,?[[:space:]]*$/d' \
+        -e 's/"custom\/hyprcaffeine"[[:space:]]*,[[:space:]]*//g' \
+        -e 's/,[[:space:]]*"custom\/hyprcaffeine"//g' \
+        -e 's/\[[[:space:]]*"custom\/hyprcaffeine"[[:space:]]*\]/[]/g' \
+        "$WB_CONFIG" 2>/dev/null
+    _log "✅ Removed module placement"
     _changed=true
 fi
 
