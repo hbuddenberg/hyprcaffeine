@@ -49,9 +49,23 @@ if _is_idle_active; then
     MENU_ITEMS+=("󰤆 Turn Off (${REMAINING:-active})")
 fi
 
-# Render the menu. printf '%s\n' emits exactly one item per line with a single
-# trailing newline (no trailing empty line), so dmenu-style launchers
-# (walker/wofi/rofi) don't show a spurious blank option at the end of the list.
+# Hierarchy: 1. Quickshell -> 2. Walker -> 3. Wofi -> 4. Rofi -> 5. Gum
+if command -v quickshell &>/dev/null; then
+    _qs_ui=""
+    if [[ -d "${LIB_DIR}/../ui" && -f "${LIB_DIR}/../ui/shell.qml" ]]; then
+        _qs_ui="${LIB_DIR}/../ui/shell.qml"
+    elif [[ -f "${HOME}/.config/hyprcaffeine/ui/shell.qml" ]]; then
+        _qs_ui="${HOME}/.config/hyprcaffeine/ui/shell.qml"
+    elif [[ -f "/usr/share/hyprcaffeine/ui/shell.qml" ]]; then
+        _qs_ui="/usr/share/hyprcaffeine/ui/shell.qml"
+    fi
+    if [[ -n "${_qs_ui}" ]]; then
+        quickshell -p "${_qs_ui}" >/dev/null 2>&1
+        exit 0
+    fi
+fi
+
+# Render fallback menu (Walker/Wofi/Rofi/Gum)
 _choice=""
 if command -v walker &>/dev/null; then
     _choice=$(printf '%s\n' "${MENU_ITEMS[@]}" | walker -d -N -H --placeholder="☕ Caffeine" --maxheight=700 --width=330 2>/dev/null)

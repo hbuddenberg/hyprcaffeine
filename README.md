@@ -4,15 +4,13 @@
 
 ### Keep your Hyprland awake — beautifully
 
-[![Version](https://img.shields.io/badge/version-0.9.2-blue.svg?style=flat-square)](https://github.com/hbuddenberg/hyprcaffeine/releases)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg?style=flat-square)](https://github.com/hbuddenberg/hyprcaffeine/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 [![Shell: Bash](https://img.shields.io/badge/shell-bash-4EAA25.svg?style=flat-square&logo=gnubash&logoColor=white)](https://www.gnu.org/software/bash/)
 [![Hyprland](https://img.shields.io/badge/for-Hyprland-00e09e.svg?style=flat-square)](https://github.com/hyprwm/Hyprland)
 
-**HyprCaffeine** is a lightweight idle inhibition utility for [Hyprland](https://github.com/hyprwm/Hyprland).
+**HyprCaffeine** is a lightweight idle inhibition utility for [Hyprland](https://github.com/hyprwm/Hyprland) and Wayland desktop environments.
 It prevents your screen from dimming, locking, or sleeping — on your terms.
-
-![HyprCaffeine — Waybar, Notification & Walker Menu](docs/images/screenshot.png)
 
 [Report a Bug](https://github.com/hbuddenberg/hyprcaffeine/issues) ·
 [Request a Feature](https://github.com/hbuddenberg/hyprcaffeine/issues) ·
@@ -29,15 +27,15 @@ Each feature is **independent** — use them individually or combine them:
 - ⏱️ **Timer / Infinite** — blocks suspend for a set duration or indefinitely
 - 🖥️ **Keep Display On** — blocks dim, DPMS, and screen lock (persists across reboots)
 - 💻 **Block Lid** — prevents lid-close suspend (persists across reboots)
-- 📊 **Waybar integration** — live status with countdown, tooltip, and Catppuccin Mocha CSS classes
-- 🎮 **Walker menu** — interactive launcher menu via Walker (or wofi/rofi fallback)
+- 🪟 **Native Quickshell Modal UI** — gorgeous Omarchy-styled modal applet with dynamic accent border, timer chips, and hardware switches
+- 📊 **Omarchy Quickshell Bar Plugin** — native first-party style status bar widget with persistent coffee cup, real-time countdown, and hardware badges
+- 📈 **Waybar integration** — live status with countdown, tooltip, and Catppuccin Mocha CSS classes
+- 🎮 **5-Tier Launcher Hierarchy** — automatically uses the best menu available: Quickshell → Walker → Wofi → Rofi → Gum
 - ⏳ **Countdown timer** — live countdown with desktop notifications before expiry
 - 🔔 **Desktop notifications** — warned before caffeine runs out
 - 🔄 **systemd service** — auto-start with the watcher daemon
-- 🔐 **polkit auto-configure** — lid-blocking rules installed automatically
+- 🔐 **polkit auto-configure** — lid-blocking and sleep-inhibition rules installed automatically
 - 🪶 **Minimal deps** — only `bash`, `jq`, `hyprctl`, and `notify-send`
-
-![Walker Menu](docs/images/walker-menu.png)
 
 ---
 

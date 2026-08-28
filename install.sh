@@ -5,7 +5,7 @@
 # ─────────────────────────────────────────────────────────
 set -euo pipefail
 
-readonly HC_VERSION="1.0.0"
+readonly HC_VERSION="2.0.0"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Catppuccin Mocha Colors (truecolor ANSI) ─────────────
@@ -30,10 +30,13 @@ readonly SRC_SCRIPTS="${SCRIPT_DIR}/scripts"
 readonly SRC_CONFIG="${SCRIPT_DIR}/config/default.yaml"
 readonly SRC_UI_DICT="${SCRIPT_DIR}/config/ui-dictionary.json"
 readonly SRC_WAYBAR="${SCRIPT_DIR}/waybar/module.json"
+readonly SRC_UI="${SCRIPT_DIR}/ui/shell.qml"
+readonly SRC_PLUGINS="${SCRIPT_DIR}/plugins/omarchy"
 
 # ── User Config Path (always user-owned) ─────────────────
 readonly CONFIG_DIR="${HOME}/.config/hyprcaffeine"
 readonly CONFIG_FILE="${CONFIG_DIR}/config.yaml"
+readonly OMARCHY_CONFIG="${HOME}/.config/omarchy/shell.json"
 
 # ── Install Destinations (resolved dynamically) ──────────
 BIN_DIR=""
@@ -515,6 +518,51 @@ polkit.addRule(function(action, subject) {
     fi
 }
 
+# ── Quickshell & Omarchy Plugin Auto-Integration ─────────
+integrate_quickshell() {
+    header "Quickshell & Omarchy Integration"
+
+    # 1. Install modal UI
+    if [[ -f "${SRC_UI}" ]]; then
+        step "Installing Quickshell modal UI..."
+        elevated_mkdir "${DATA_DIR}/ui"
+        elevated_cp "${SRC_UI}" "${DATA_DIR}/ui/shell.qml"
+        mkdir -p "${HOME}/.config/hyprcaffeine/ui"
+        cp "${SRC_UI}" "${HOME}/.config/hyprcaffeine/ui/shell.qml"
+        success "Quickshell modal UI installed → ~/.config/hyprcaffeine/ui/shell.qml"
+    fi
+
+    # 2. Install Omarchy bar plugin
+    if [[ -d "${SRC_PLUGINS}" ]]; then
+        step "Installing Omarchy bar plugin..."
+        elevated_mkdir "${DATA_DIR}/plugins/omarchy"
+        elevated_cp "${SRC_PLUGINS}/manifest.json" "${DATA_DIR}/plugins/omarchy/"
+        elevated_cp "${SRC_PLUGINS}/BarWidget.qml" "${DATA_DIR}/plugins/omarchy/"
+
+        if [[ -d "${HOME}/.config/omarchy" ]]; then
+            mkdir -p "${HOME}/.config/omarchy/plugins/hyprcaffeine"
+            cp -r "${SRC_PLUGINS}"/* "${HOME}/.config/omarchy/plugins/hyprcaffeine/"
+            success "Omarchy bar plugin installed → ~/.config/omarchy/plugins/hyprcaffeine/"
+
+            # 3. Inject into shell.json if not present
+            if [[ -f "${OMARCHY_CONFIG}" ]]; then
+                if grep -q '"hyprcaffeine"' "${OMARCHY_CONFIG}" 2>/dev/null; then
+                    success "HyprCaffeine already present in Omarchy shell.json"
+                else
+                    step "Adding HyprCaffeine to Omarchy bar layout..."
+                    if grep -q '"omarchy.tray"' "${OMARCHY_CONFIG}" 2>/dev/null; then
+                        sed -i '/"omarchy.tray"/i\        {\n          "id": "hyprcaffeine"\n        },' "${OMARCHY_CONFIG}"
+                        success "Inserted hyprcaffeine before omarchy.tray in shell.json"
+                    elif grep -q '"right": \[' "${OMARCHY_CONFIG}" 2>/dev/null; then
+                        sed -i 's/"right"\s*:\s*\[/"right": [\n        {\n          "id": "hyprcaffeine"\n        },/' "${OMARCHY_CONFIG}"
+                        success "Added hyprcaffeine to right bar layout in shell.json"
+                    fi
+                fi
+            fi
+        fi
+    fi
+}
+
 # ── Install ──────────────────────────────────────────────
 do_install() {
     header "Installing ${APP_NAME}"
@@ -610,13 +658,16 @@ do_install() {
         echo ""
     fi
 
-    # 8. Waybar auto-integration
+    # 8. Quickshell & Omarchy integration
+    integrate_quickshell
+
+    # 9. Waybar auto-integration
     integrate_waybar
 
-    # 9. Systemd user service
+    # 10. Systemd user service
     install_systemd_service
 
-    # 10. Hyprland keybindings
+    # 11. Hyprland keybindings
     install_keybinds
 }
 

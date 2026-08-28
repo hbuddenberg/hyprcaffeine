@@ -18,7 +18,7 @@ else
 fi
 
 # ── Version ──────────────────────────────────────────────────────────────────
-readonly VERSION="0.9.2"
+readonly VERSION="2.0.0"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Dry Run Mode ─────────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ SUBCOMMANDS:
     status              Show current state
     toggle              Toggle sleep inhibition on/off
     waybar              Output Waybar-compatible JSON status
-    menu                Walker/wofi launcher menu
+    menu                Open interactive menu (Quickshell / Walker / Wofi / Rofi / Gum)
     monitor on|off|toggle  Keep Display On (blocks dim + DPMS)
     lid on|off|toggle      Block lid-close suspend
     waybar-setup [--force]  Configure waybar integration (smart)
@@ -91,7 +91,7 @@ SUBCOMMANDS:
     keybinds install|remove|status  Manage Hyprland keybindings
     watcher start|stop|status  Auto-activate daemon
     polkit install|remove|status  Manage polkit rule (requires sudo)
-    setup               Run post-install configuration (polkit + waybar + systemd + keybinds)
+    setup               Run post-install configuration (polkit + waybar + quickshell + systemd + keybinds)
     reinstall           Re-run setup (alias for setup)
     uninstall           Remove HyprCaffeine and all user files
 
@@ -669,11 +669,44 @@ do_setup() {
         echo "        ⚠️  Service file not found — skipped"
     fi
 
-    echo "  [4/4] Hyprland keybindings..."
+    echo "  [4/5] Hyprland keybindings..."
     if _kb_install 2>/dev/null; then
         echo "        ✅ Keybindings installed"
     else
         echo "        ⚠️  Keybindings skipped"
+    fi
+
+    echo "  [5/5] Quickshell UI & Omarchy plugin..."
+    local ui_src=""
+    for candidate in \
+        "${LIB_DIR}/../ui/shell.qml" \
+        "/usr/share/hyprcaffeine/ui/shell.qml" \
+        "${HOME}/.local/share/hyprcaffeine/ui/shell.qml"; do
+        if [[ -f "${candidate}" ]]; then
+            ui_src="${candidate}"
+            break
+        fi
+    done
+    if [[ -n "${ui_src}" ]]; then
+        mkdir -p "${HOME}/.config/hyprcaffeine/ui"
+        cp "${ui_src}" "${HOME}/.config/hyprcaffeine/ui/shell.qml"
+        echo "        ✅ Quickshell UI installed"
+    fi
+
+    local plugin_src=""
+    for candidate in \
+        "${LIB_DIR}/../plugins/omarchy" \
+        "/usr/share/hyprcaffeine/plugins/omarchy" \
+        "${HOME}/.local/share/hyprcaffeine/plugins/omarchy"; do
+        if [[ -d "${candidate}" ]]; then
+            plugin_src="${candidate}"
+            break
+        fi
+    done
+    if [[ -n "${plugin_src}" && -d "${HOME}/.config/omarchy" ]]; then
+        mkdir -p "${HOME}/.config/omarchy/plugins/hyprcaffeine"
+        cp -r "${plugin_src}"/* "${HOME}/.config/omarchy/plugins/hyprcaffeine/"
+        echo "        ✅ Omarchy bar plugin installed"
     fi
 
     echo ""
@@ -797,12 +830,7 @@ main() {
             do_waybar
             ;;
         menu)
-            # Launch menu via hyprctl so it gets proper Wayland context
-            if command -v hyprctl &>/dev/null && [[ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]]; then
-                hyprctl dispatch exec "bash '${LIB_DIR}/caffeine-menu.sh'" 2>/dev/null
-            else
-                bash "${LIB_DIR}/caffeine-menu.sh"
-            fi
+            bash "${LIB_DIR}/caffeine-menu.sh"
             ;;
         waybar-setup)
             bash "${LIB_DIR}/waybar-setup.sh" "${1:-}"

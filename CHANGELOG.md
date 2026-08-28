@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.0.0] — 2026-08-28
+
+### Added
+
+- **Native Quickshell Modal UI (`ui/shell.qml`)**: Modern standalone applet matching the Omarchy 4 design system with a clean square geometry (`radius: 4px`), dynamic 2px perimeter accent border reading live from `colors.toml`, real-time status badges, quick timer chips (15m, 30m, 1h, 2h, Infinito, Custom), and hardware toggles for Keep Display On and Lid Inhibit with dedicated accent colors.
+- **First-Class Omarchy Quickshell Bar Plugin (`plugins/omarchy/`)**: Native Quickshell status bar widget with persistent coffee cup indicator, live second-by-second countdown timer, Nerd Font infinity glyph (`󰛤`), hardware status badges, and real-time process-based disk state polling.
+- **5-Tier Launcher Hierarchy**: `caffeine-menu.sh` now gracefully cascades through available launchers: `Quickshell` → `Walker` → `Wofi` → `Rofi` → `Gum`.
+- **Automated Polkit Installation**: Polkit rules for sleep and lid inhibition are now installed directly to `/usr/share/polkit-1/rules.d/50-hyprcaffeine.rules` in the Arch package, allowing members of the `wheel` group to inhibit sleep and lid-switch actions without interactive authentication.
+- **Full Autoinstaller Upgrade (`install.sh`)**: The robust standalone installer now handles Quickshell modal deployment, Omarchy bar plugin integration (including auto-injection into `~/.config/omarchy/shell.json`), Polkit setup, Waybar configuration, Systemd user service, and keybindings in one automated run.
+
+### Fixes
+
+- **Hyprland 0.50+ / Lua Menu Dispatch**: Fixed menu invocation in `bin/hyprcaffeine` by executing the menu script directly instead of passing single-quoted commands to `hyprctl dispatch exec`, eliminating Lua syntax parsing errors under Omarchy 4 and Hyprland 0.50+.
+- **Process State Lifecycle**: Fixed subprocess race conditions in Quickshell modal by introducing a graceful execution lifecycle that ensures background commands complete before closing the UI.
+
 ---
 
 ## [0.9.2] — 2026-07-02
