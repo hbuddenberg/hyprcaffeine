@@ -16,8 +16,8 @@ optdepends=(
     'libnotify: desktop notifications'
 )
 install=hyprcaffeine.install
-source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v$pkgver/$pkgname-$pkgver.tar.gz")
-sha256sums=('SKIP')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('9af346e0f10383084cb65442d7fb11922e456ea47a362163b754efd92354f5a6')
 
 prepare() {
     cd "$srcdir/$pkgname-$pkgver" || return
