@@ -1,6 +1,6 @@
 pkgbase = hyprcaffeine
 	pkgdesc = ☕ Idle inhibition utility for Hyprland & Wayland compositors with Quickshell, Waybar, and Walker/Wofi menus
-	pkgver = 2.0.0
+	pkgver = 2.0.1
 	pkgrel = 1
 	url = https://github.com/hbuddenberg/hyprcaffeine
 	install = hyprcaffeine.install
@@ -17,7 +17,7 @@ pkgbase = hyprcaffeine
 	optdepends = rofi-wayland: dmenu replacement for Wayland
 	optdepends = gum: interactive menu and styled prompts
 	optdepends = libnotify: desktop notifications
-	source = hyprcaffeine-2.0.0.tar.gz::https://github.com/hbuddenberg/hyprcaffeine/archive/refs/tags/v2.0.0.tar.gz
-	sha256sums = 9af346e0f10383084cb65442d7fb11922e456ea47a362163b754efd92354f5a6
+	source = hyprcaffeine-2.0.1.tar.gz::https://github.com/hbuddenberg/hyprcaffeine/archive/refs/tags/v2.0.1.tar.gz
+	sha256sums = 6ce86496754d31d6e9149960fcf63788e1681c66c01db2cec2c28a34599d5595
 
 pkgname = hyprcaffeine
