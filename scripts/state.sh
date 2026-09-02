@@ -45,6 +45,14 @@ state_save() {
     cat > "${STATE_FILE}" <<STATEEOF
 {"status":"${status}","duration":${duration},"activated_at":"${activated_at}","pid":"${pid}","monitor":${monitor},"lid":${lid}}
 STATEEOF
+
+    # Sync with Omarchy idle service stay-awake indicator to prevent screen locking
+    local omarchy_dir="${HOME}/.local/state/omarchy/indicators"
+    if [[ "${status}" == "active" || "${monitor}" == "true" ]]; then
+        mkdir -p "${omarchy_dir}" && touch "${omarchy_dir}/stay-awake"
+    else
+        rm -f "${omarchy_dir}/stay-awake"
+    fi
 }
 
 # ── Idle State ─────────────────────────────────────────────────────────────

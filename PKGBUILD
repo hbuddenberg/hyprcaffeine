@@ -1,6 +1,6 @@
 # Maintainer: Hans-Dieter Buddenberg <hbuddenberg@gmail.com>
 pkgname=hyprcaffeine
-pkgver=2.0.0
+pkgver=2.0.1
 pkgrel=1
 pkgdesc='☕ Idle inhibition utility for Hyprland & Wayland compositors with Quickshell, Waybar, and Walker/Wofi menus'
 arch=(any)

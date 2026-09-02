@@ -5,7 +5,7 @@
 # ─────────────────────────────────────────────────────────
 set -euo pipefail
 
-readonly HC_VERSION="2.0.0"
+readonly HC_VERSION="2.0.1"
 readonly APP_NAME="HyprCaffeine"
 
 # ── Catppuccin Mocha Colors (truecolor ANSI) ─────────────
